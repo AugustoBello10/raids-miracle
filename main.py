@@ -64,4 +64,6 @@ def loop_monitoramento():
 if __name__ == "__main__":
     t = Thread(target=loop_monitoramento)
     t.start()
+    # Linha de teste abaixo:
+    requests.post(WEBHOOK_URL, json={"content": "✅ **Bot de Raids Online!** Monitoramento iniciado com sucesso."})
     run_web_server()
