@@ -1,44 +1,83 @@
-# calculadora.py
+import math
 
+# --- LÓGICA DE SKILLS (TIBIA 7.4) ---
+def calcular_tempo_skill(vocacao, tipo_skill, atual, pct_atual, alvo, intervalo_ataque=2.0):
+    """
+    Calcula tempo de treino considerando a % atual e velocidade da arma.
+    """
+    vocacao = vocacao.lower()
+    tipo_skill = tipo_skill.lower()
+    
+    # CONSTANTES DE DIFICULDADE (A)
+    # Quanto maior, mais difícil subir.
+    CONSTANTES = {
+        'knight':    {'melee': 50,  'distance': 140, 'shielding': 100},
+        'paladin':   {'melee': 120, 'distance': 25,  'shielding': 100},
+        'druid':     {'melee': 200, 'distance': 200, 'shielding': 100},
+        'sorcerer':  {'melee': 200, 'distance': 200, 'shielding': 100}
+    }
+    
+    # Tenta pegar a constante. Se a combinação não existir (ex: Druid melee), usa o padrão 50.
+    try:
+        A = CONSTANTES[vocacao][tipo_skill]
+    except KeyError:
+        A = 50 
+
+    B = 1.1 # Constante exponencial padrão
+    
+    hits_totais = 0
+    
+    for level in range(atual, alvo):
+        # Hits para fechar o nível inteiro
+        hits_nivel = A * (math.pow(B, (level - 10)))
+        
+        if level == atual:
+            # Desconta o que já foi treinado (Ex: Se tem 20%, falta 80%)
+            fator_restante = 1 - (pct_atual / 100.0)
+            hits_totais += hits_nivel * fator_restante
+        else:
+            hits_totais += hits_nivel
+            
+    # Converte Hits em Tempo (Segundos)
+    segundos_totais = hits_totais * intervalo_ataque
+    
+    # Formatação (Dias, Horas, Minutos, Segundos)
+    dias = int(segundos_totais // 86400)
+    restante = segundos_totais % 86400
+    horas = int(restante // 3600)
+    restante %= 3600
+    minutos = int(restante // 60)
+    segundos = int(restante % 60)
+    
+    return {
+        "dias": dias,
+        "horas": horas,
+        "minutos": minutos,
+        "segundos": segundos,
+        "hits": int(hits_totais)
+    }
+
+# --- LÓGICA DE CRAFTING (MANTIDA) ---
 def calcular_crafting_detalhado(skill_atual, multiplicador, ingredientes, quantidade_desejada=1):
-    """
-    Calcula chance de sucesso, materiais e custos para o Miracle 7.4.
-    O dicionário 'ingredientes' deve conter: {'Item': {'qtd': x, 'preco': y, 'consome_na_falha': bool}}
-    """
-    
-    # 1. Fórmula original do Miracle 7.4
     chance_real = 10 + ((skill_atual - 10) * multiplicador)
-    
-    # 2. CAP de 100% para exibição e cálculos (Não existe mais de 100% de chance lógica)
     chance_exibicao = min(chance_real, 100)
-    
-    # 3. Cálculo de Tentativas Necessárias
-    # Se a chance for 100%, tentativas = quantidade_desejada.
-    # Se for 50%, tentativas = quantidade_desejada * 2.
-    chance_decimal = max(chance_exibicao / 100, 0.01) 
-    tentativas_estimadas = quantidade_desejada / chance_decimal
+    chance_decimal = max(chance_exibicao / 100, 0.01)
+    tentativas = quantidade_desejada / chance_decimal
     
     materiais_totais = {}
-    custo_total_estimado = 0
+    custo_total = 0
     
-    # 4. Processamento dos Ingredientes (Integrando a alteração sugerida)
-    for nome_item, dados in ingredientes.items():
-        # Verificação da regra de consumo (Ex: Onyx não se perde na falha)
+    for nome, dados in ingredientes.items():
         if dados.get('consome_na_falha', True):
-            # Itens normais: quantidade multiplicada pela média de tentativas
-            qtd_total = round(tentativas_estimadas * dados['qtd'], 2)
+            qtd = round(tentativas * dados['qtd'], 2)
         else:
-            # Itens especiais (Onyx): você só precisa da quantidade da receita original uma única vez
-            qtd_total = dados['qtd']
-            
-        materiais_totais[nome_item] = qtd_total
-        
-        # O preço 'y' aqui será o valor que o usuário inseriu no Discord
-        custo_total_estimado += qtd_total * dados['preco']
+            qtd = dados['qtd'] * quantidade_desejada
+        materiais_totais[nome] = qtd
+        custo_total += qtd * dados['preco']
 
     return {
         "chance_sucesso": chance_exibicao,
-        "tentativas_para_meta": round(tentativas_estimadas, 1),
+        "tentativas_para_meta": round(tentativas, 1),
         "materiais_necessarios": materiais_totais,
-        "custo_total": round(custo_total_estimado, 2)
+        "custo_total": round(custo_total, 2)
     }
