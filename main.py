@@ -21,7 +21,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Ultimate V9) Online"
+def home(): return "Bot Bellão (Final V10) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -65,22 +65,6 @@ def loop_monitoramento():
                     requests.post(WEBHOOK_URL, json={"content": msg})
             time.sleep(60)
         except: time.sleep(60)
-
-@bot.tree.command(name="checar_raids", description="Verifica as próximas raids.")
-async def checar_raids(interaction: discord.Interaction):
-    await interaction.response.defer()
-    raids = carregar_raids()
-    agora = datetime.now(FUSO_BRASILIA)
-    futuras = sorted([r for r in raids if r['proxima'] > agora], key=lambda x: x['proxima'])
-    
-    if not futuras: await interaction.followup.send("❌ Nenhuma raid futura detectada.")
-    else:
-        txt = "**📋 Próximas Raids:**\n"
-        for r in futuras[:8]:
-            d = r['proxima'] - agora
-            h, m = int(d.total_seconds()//3600), int((d.total_seconds()%3600)//60)
-            txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
-        await interaction.followup.send(txt)
 
 # ==========================================
 # 🔄 VIEW DE REINICIO (LOOP INFINITO)
@@ -361,14 +345,36 @@ class PersistentControlView(ui.View):
         v = ui.View(); v.add_item(LanguageSelect())
         await i.response.send_message("🇧🇷 🇺🇸 🇵🇱", view=v, ephemeral=True)
 
+# ----------------------------------------------
+# ⚠️ IMPORTANTE: A Classe do Bot e a Instância
+# PRECISAM vir antes dos comandos @bot.tree
+# ----------------------------------------------
 class MyBot(discord.Client):
     def __init__(self): super().__init__(intents=discord.Intents.all()); self.tree = app_commands.CommandTree(self)
     async def setup_hook(self): self.add_view(PersistentControlView()); await self.tree.sync()
 
 bot = MyBot()
+
+# --- COMANDOS AGORA NO FINAL (DEPOIS DO BOT SER CRIADO) ---
 @bot.tree.command(name="setup_calculadora")
 async def setup(interaction: discord.Interaction):
     await interaction.response.send_message(embed=discord.Embed(title="⚒️ Miracle Tools", color=discord.Color.gold()), view=PersistentControlView())
+
+@bot.tree.command(name="checar_raids", description="Verifica as próximas raids.")
+async def checar_raids(interaction: discord.Interaction):
+    await interaction.response.defer()
+    raids = carregar_raids()
+    agora = datetime.now(FUSO_BRASILIA)
+    futuras = sorted([r for r in raids if r['proxima'] > agora], key=lambda x: x['proxima'])
+    
+    if not futuras: await interaction.followup.send("❌ Nenhuma raid futura detectada.")
+    else:
+        txt = "**📋 Próximas Raids:**\n"
+        for r in futuras[:8]:
+            d = r['proxima'] - agora
+            h, m = int(d.total_seconds()//3600), int((d.total_seconds()%3600)//60)
+            txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
+        await interaction.followup.send(txt)
 
 if __name__ == "__main__":
     if TOKEN:
