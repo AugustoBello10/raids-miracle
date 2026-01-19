@@ -1,8 +1,10 @@
+# ... (Imports e configurações iniciais iguais) ...
 import discord
 import requests
 import pytz
 import time
 import os
+import math
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from flask import Flask
@@ -18,13 +20,12 @@ WEBHOOK_URL = os.environ.get('WEBHOOK_URL')
 URL_RAIDS = "https://miracle74.com/?subtopic=raids"
 FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
-# --- FLASK ---
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Raids + Skills V5) Online"
+def home(): return "Bot Bellão (Raids + Skills V8) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
-# --- RAIDS ---
+# --- RAIDS (MANTIDO) ---
 def carregar_raids():
     try:
         response = requests.get(URL_RAIDS, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
@@ -60,96 +61,209 @@ def loop_monitoramento():
         except: time.sleep(60)
 
 # ==========================================
-# ⚔️ SISTEMA DE SKILLS (FLUXO FINAL)
+# ⚔️ SISTEMA DE SKILLS
 # ==========================================
 
-class SkillCalcModal(ui.Modal):
-    def __init__(self, vocacao, tipo_skill, arma_nome, arma_speed, lang):
-        self.lang = lang
-        self.vocacao = vocacao
-        self.tipo_skill = tipo_skill
-        self.arma_speed = arma_speed
-        self.arma_nome = arma_nome
+class DualSkillModal(ui.Modal):
+    def __init__(self, vocacao, tipo_melee, tier_arma, lang):
+        self.lang = lang; self.vocacao = vocacao; self.tipo_melee = tipo_melee
+        self.tier = tier_arma # Armazena o nome exato do tier selecionado
+        
+        # Lógica de seleção de stats
+        if "Spark" in self.tier:
+            w_key = next((k for k in ARMAS_TREINO if "Spark" in k and "Weapon" in k), None)
+            s_key = next((k for k in ARMAS_TREINO if "Spark" in k and "Shield" in k), None)
+        elif "Lightning" in self.tier:
+            w_key = next((k for k in ARMAS_TREINO if "Lightning" in k and "Weapon" in k), None)
+            s_key = next((k for k in ARMAS_TREINO if "Lightning" in k and "Shield" in k), None)
+        elif "Inferno" in self.tier:
+            w_key = next((k for k in ARMAS_TREINO if "Inferno" in k and "Weapon" in k), None)
+            s_key = next((k for k in ARMAS_TREINO if "Inferno" in k and "Shield" in k), None)
+        elif "-5%" in self.tier:
+            w_key = "Weapon (-5% Atk Speed)"
+            s_key = "Normal / Nenhuma" # Shield normal
+        elif "-6%" in self.tier:
+            w_key = "Weapon (-6% Atk Speed)"
+            s_key = "Normal / Nenhuma" # Shield normal
+        else: # Normal
+            w_key = "Normal / Nenhuma"
+            s_key = "Normal / Nenhuma"
+
+        # Ajuste para Spear se for Distance
+        if tipo_melee == 'distance' and "Spark" in str(w_key):
+             w_key = next((k for k in ARMAS_TREINO if "Spark" in k and "Spear" in k), w_key)
+        # (Repetir para Lightning/Inferno se Spear existir, senão usa Weapon mesmo ou Normal)
+
+        self.w_stats = ARMAS_TREINO.get(w_key, ARMAS_TREINO["Normal / Nenhuma"])
+        self.s_stats = ARMAS_TREINO.get(s_key, ARMAS_TREINO["Normal / Nenhuma"])
+
         t = TEXTOS[lang]
-        
-        super().__init__(title=f"{vocacao.capitalize()} - {tipo_skill.capitalize()}")
-        
-        self.add_item(ui.TextInput(label="Skill Atual", placeholder="Ex: 80", custom_id="curr", max_length=3))
-        self.add_item(ui.TextInput(label="% Atual (Quanto já treinou?)", placeholder="Ex: 50 (50% concluído)", custom_id="pct", max_length=3))
-        self.add_item(ui.TextInput(label="Skill Desejado", placeholder="Ex: 85", custom_id="target", max_length=3))
+        super().__init__(title=f"{vocacao.capitalize()} (Treino Duplo)")
+        self.add_item(ui.TextInput(label=f"{tipo_melee.capitalize()} (Atual - Alvo)", placeholder="Ex: 80-85", custom_id="melee_vals"))
+        self.add_item(ui.TextInput(label=f"{tipo_melee.capitalize()} % (Já treinado)", placeholder="Ex: 50 (50%)", custom_id="melee_pct", max_length=3))
+        self.add_item(ui.TextInput(label="Shielding (Atual - Alvo)", placeholder="Ex: 75-80", custom_id="shield_vals"))
+        self.add_item(ui.TextInput(label="Shielding % (Já treinado)", placeholder="Ex: 0 (0%)", custom_id="shield_pct", max_length=3))
+        self.add_item(ui.TextInput(label="Preço Unit. Arma (Opcional)", placeholder="Ex: 150000", required=False, custom_id="price"))
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
-            curr = int(self.children[0].value)
-            pct = float(self.children[1].value.replace(',', '.'))
-            target = int(self.children[2].value)
-            
-            if target <= curr:
-                await interaction.response.send_message("❌ Target > Current.", ephemeral=True); return
-            if pct < 0 or pct >= 100:
-                await interaction.response.send_message("❌ % 0-99.", ephemeral=True); return
+            m_curr, m_target = map(int, self.children[0].value.replace('/', '-').split('-'))
+            m_pct = float(self.children[1].value.replace(',', '.'))
+            s_curr, s_target = map(int, self.children[2].value.replace('/', '-').split('-'))
+            s_pct = float(self.children[3].value.replace(',', '.'))
+            price_unit = int(self.children[4].value.replace('.', '').replace('k', '000')) if self.children[4].value else 0
 
+            res_m = calcular_tempo_skill(self.vocacao, self.tipo_melee, m_curr, m_pct, m_target, self.w_stats['speed'])
+            res_s = calcular_tempo_skill(self.vocacao, "shielding", s_curr, s_pct, s_target, self.s_stats['speed'])
+            
+            # Custo: Se for infinita (charges > 10 milhões), considera 1 unidade
+            qtd_weapons = math.ceil(res_m['hits'] / self.w_stats['charges'])
+            if self.w_stats['charges'] > 999999: qtd_weapons = 1
+            
+            qtd_shields = math.ceil(res_s['hits'] / self.s_stats['charges'])
+            if self.s_stats['charges'] > 999999: qtd_shields = 1
+            
+            total_gp = (qtd_weapons * price_unit) + (qtd_shields * price_unit)
+            # Se for arma especial mas shield normal, cobra so arma (ajuste logico)
+            if "Normal" in str(self.s_stats['charges']): total_gp = qtd_weapons * price_unit
+
+            embed = discord.Embed(title=f"⚔️ Treino Duplo: {self.tier.split('(')[0]}", color=discord.Color.purple())
+            
+            t_txt = f"{res_m['dias']}d {res_m['horas']}h {res_m['minutos']}m"
+            w_val = f"{qtd_weapons}x" if self.w_stats['charges'] < 999999 else "1x (Eterna)"
+            
+            s_txt = f"{res_s['dias']}d {res_s['horas']}h {res_s['minutos']}m"
+            s_val = f"{qtd_shields}x" if self.s_stats['charges'] < 999999 else "—"
+
+            embed.add_field(name=f"⚔️ {self.tipo_melee.capitalize()}: {m_curr}➝{m_target}", value=f"⏱️ {t_txt}\n📦 {w_val}", inline=True)
+            embed.add_field(name=f"🛡️ Shield: {s_curr}➝{s_target}", value=f"⏱️ {s_txt}\n📦 {s_val}", inline=True)
+            
+            if price_unit > 0:
+                embed.add_field(name="💰 Custo Estimado", value=f"{total_gp:,} gp", inline=False)
+            
+            embed.set_footer(text=f"Hits Totais: {res_m['hits']:,} (Atk) / {res_s['hits']:,} (Def)")
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except ValueError:
+            await interaction.response.send_message("❌ Formato inválido. Use '80-85' para niveis.", ephemeral=True)
+
+class SingleSkillModal(ui.Modal):
+    def __init__(self, vocacao, tipo_skill, arma_nome, arma_speed, arma_charges, lang):
+        self.lang = lang; self.vocacao = vocacao; self.tipo_skill = tipo_skill
+        self.arma_speed = arma_speed; self.arma_nome = arma_nome; self.arma_charges = arma_charges
+        t = TEXTOS[lang]
+        super().__init__(title=f"{vocacao} - {tipo_skill}")
+        self.add_item(ui.TextInput(label="Skill Atual", placeholder="Ex: 80", custom_id="c"))
+        self.add_item(ui.TextInput(label="% Atual", placeholder="Ex: 50", custom_id="p"))
+        self.add_item(ui.TextInput(label="Skill Desejado", placeholder="Ex: 85", custom_id="t"))
+        req_price = True if "Normal" not in arma_nome else False
+        lbl_price = "Preço Arma (Opcional)" if req_price else "Preço (Não se aplica)"
+        self.add_item(ui.TextInput(label=lbl_price, required=False, placeholder="Ex: 10000", custom_id="pr"))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            curr = int(self.children[0].value); pct = float(self.children[1].value.replace(',', '.'))
+            target = int(self.children[2].value)
+            price = int(self.children[3].value.replace('.', '').replace('k', '000')) if self.children[3].value and self.children[3].value[0].isdigit() else 0
+            
             res = calcular_tempo_skill(self.vocacao, self.tipo_skill, curr, pct, target, self.arma_speed)
+            
+            # Custo
+            qtd = math.ceil(res['hits'] / self.arma_charges)
+            if self.arma_charges > 999999: qtd = 1
+            cost = qtd * price
             
             t = TEXTOS[self.lang]
             embed = discord.Embed(title=f"⚔️ {self.vocacao.capitalize()} - {self.tipo_skill.capitalize()}", color=discord.Color.red())
+            time_str = f"{res['dias']}d {res['horas']}h {res['minutos']}m"
             
-            tempo_txt = []
-            if res['dias'] > 0: tempo_txt.append(f"**{res['dias']}**d")
-            if res['horas'] > 0: tempo_txt.append(f"**{res['horas']}**h")
-            if res['minutos'] > 0: tempo_txt.append(f"**{res['minutos']}**m")
-            tempo_txt.append(f"**{res['segundos']}**s")
+            embed.add_field(name=t['time_est'], value=f"⏱️ **{time_str}**", inline=False)
             
-            embed.description = f"**{curr}** ({int(pct)}%) ➝ **{target}**"
-            embed.add_field(name=t['time_est'], value=", ".join(tempo_txt), inline=False)
-            embed.add_field(name=t['hits'], value=f"{res['hits']:,}", inline=True)
-            embed.add_field(name=t['weapon'], value=f"{self.arma_nome} ({self.arma_speed}s)", inline=True)
+            r_val = f"Hits: {res['hits']:,}"
+            if "Normal" not in self.arma_nome:
+                suffix = "(Eterna)" if self.arma_charges > 999999 else self.arma_nome
+                r_val += f"\nQtd: **{qtd}x** {suffix}"
+                if cost > 0: embed.add_field(name="💰 Custo", value=f"{cost:,} gp", inline=True)
             
+            embed.add_field(name="📦 Recursos", value=r_val, inline=True)
             await interaction.response.send_message(embed=embed, ephemeral=True)
-        except ValueError:
-            await interaction.response.send_message("❌ Error: Numbers only.", ephemeral=True)
+        except: await interaction.response.send_message("❌ Erro", ephemeral=True)
 
 class WeaponSelect(ui.Select):
     def __init__(self, vocacao, tipo_skill, lang):
         self.vocacao = vocacao; self.tipo_skill = tipo_skill; self.lang = lang
-        opts = [discord.SelectOption(label=n, description=f"Speed: {s}s", value=f"{n}|{s}") for n, s in ARMAS_TREINO.items()]
-        super().__init__(placeholder="Select Weapon / Arma...", options=opts)
+        opts = []
+        # Lista com as novas opções
+        tiers = [
+            "Normal / Nenhuma", 
+            "Weapon (-5% Atk Speed)", 
+            "Weapon (-6% Atk Speed)",
+            "Spark Weapon/Shield", 
+            "Lightning Weapon/Shield", 
+            "Inferno Weapon/Shield"
+        ]
+        for t in tiers:
+            # Value é o identificador que usaremos no callback
+            val = t
+            if "Spark" in t: val = "Spark"
+            elif "Lightning" in t: val = "Lightning"
+            elif "Inferno" in t: val = "Inferno"
+            
+            opts.append(discord.SelectOption(label=t, value=val))
+        
+        super().__init__(placeholder="Escolha o Tier da Arma...", options=opts)
 
     async def callback(self, interaction: discord.Interaction):
-        n, s = self.values[0].split('|')
-        await interaction.response.send_modal(SkillCalcModal(self.vocacao, self.tipo_skill, n, float(s), self.lang))
+        tier = self.values[0] # Pode ser "Normal / Nenhuma", "-5%...", "Spark", etc.
+        
+        if self.tipo_skill == "dual_melee":
+            await interaction.response.send_modal(DualSkillModal(self.vocacao, "melee", tier, self.lang))
+        elif self.tipo_skill == "dual_dist":
+            await interaction.response.send_modal(DualSkillModal(self.vocacao, "distance", tier, self.lang))
+        else:
+            # Single Mode
+            stats = ARMAS_TREINO["Normal / Nenhuma"]
+            nome_arma = tier
+            
+            # Lógica para achar os stats corretos
+            # Se for tier simples (Spark/Lightning/Inferno)
+            if tier in ["Spark", "Lightning", "Inferno"]:
+                for k, v in ARMAS_TREINO.items():
+                    if tier in k:
+                        if "shield" in self.tipo_skill and "Shield" in k:
+                            stats = v; nome_arma = k; break
+                        elif "shield" not in self.tipo_skill and "Weapon" in k: 
+                            stats = v; nome_arma = k; break
+            else:
+                # Se for Normal ou -5%/-6%, o nome no dict é igual ao value
+                stats = ARMAS_TREINO.get(tier, ARMAS_TREINO["Normal / Nenhuma"])
+            
+            await interaction.response.send_modal(SingleSkillModal(self.vocacao, self.tipo_skill, nome_arma, stats['speed'], stats['charges'], self.lang))
 
+# ... (RESTANTE DO CÓDIGO IGUAL: SkillTypeSelect, VocationSelect, Crafting, etc) ...
 class SkillTypeSelect(ui.Select):
     def __init__(self, vocacao, lang):
         self.vocacao = vocacao; self.lang = lang
         opts = [
-            discord.SelectOption(label="⚔️ Melee (Sword/Axe/Club)", value="melee"),
-            discord.SelectOption(label="🏹 Distance", value="distance"),
-            discord.SelectOption(label="🛡️ Shielding", value="shielding")
+            discord.SelectOption(label="⚔️ Melee + Shield (Juntos)", value="dual_melee", description="Calcula os dois ao mesmo tempo"),
+            discord.SelectOption(label="🏹 Distance + Shield (Juntos)", value="dual_dist", description="Calcula Spear + Shield"),
+            discord.SelectOption(label="⚔️ Apenas Melee", value="melee"),
+            discord.SelectOption(label="🛡️ Apenas Shielding", value="shielding"),
+            discord.SelectOption(label="🏹 Apenas Distance", value="distance")
         ]
-        super().__init__(placeholder="Select Skill Type...", options=opts)
+        super().__init__(placeholder="Qual treino?", options=opts)
 
     async def callback(self, interaction: discord.Interaction):
         v = ui.View(); v.add_item(WeaponSelect(self.vocacao, self.values[0], self.lang))
-        await interaction.response.edit_message(content=f"🛠️ **{self.values[0].capitalize()}**. Select Weapon:", view=v)
+        await interaction.response.edit_message(content=f"🛠️ Configurando **{self.values[0]}**. Qual arma?", view=v)
 
 class VocationSelect(ui.Select):
     def __init__(self, lang):
         self.lang = lang
-        opts = [
-            discord.SelectOption(label="🛡️ Knight", value="knight"),
-            discord.SelectOption(label="🏹 Paladin", value="paladin"),
-            discord.SelectOption(label="🔥 Mage (Sorc/Druid)", value="druid")
-        ]
-        super().__init__(placeholder="Select Vocation...", options=opts)
-
+        opts = [discord.SelectOption(label="🛡️ Knight", value="knight"), discord.SelectOption(label="🏹 Paladin", value="paladin"), discord.SelectOption(label="🔥 Mage", value="druid")]
+        super().__init__(placeholder="Vocação...", options=opts)
     async def callback(self, interaction: discord.Interaction):
         v = ui.View(); v.add_item(SkillTypeSelect(self.values[0], self.lang))
-        await interaction.response.send_message("Select Skill Type:", view=v, ephemeral=True)
-
-# ==========================================
-# 🧮 SISTEMA DE CRAFTING
-# ==========================================
+        await interaction.response.send_message("Tipo de Treino:", view=v, ephemeral=True)
 
 class DynamicCraftingModal(ui.Modal):
     def __init__(self, item_name, receita_data, lang):
@@ -208,9 +322,6 @@ class CategorySelect(ui.Select):
         v = ui.View(); v.add_item(ItemSelect(self.values[0], self.lang))
         await interaction.response.edit_message(content=TEXTOS[self.lang]['ask_category'], view=v)
 
-# ==========================================
-# 🚦 MENU INICIAL
-# ==========================================
 class ModeSelect(ui.View):
     def __init__(self, lang):
         super().__init__(); self.lang = lang
@@ -219,6 +330,10 @@ class ModeSelect(ui.View):
     async def craft(self, interaction: discord.Interaction, button: ui.Button):
         v = ui.View(); v.add_item(CategorySelect(self.lang))
         await interaction.response.send_message(TEXTOS[self.lang]['select_cat'], view=v, ephemeral=True)
+
+    @ui.button(label="🧪 Alchemy", style=discord.ButtonStyle.success, disabled=True)
+    async def alchemy(self, interaction: discord.Interaction, button: ui.Button):
+        await interaction.response.send_message("Coming soon...", ephemeral=True)
 
     @ui.button(label="⚔️ Skills", style=discord.ButtonStyle.danger)
     async def skills(self, interaction: discord.Interaction, button: ui.Button):
@@ -238,7 +353,7 @@ class LanguageSelect(ui.Select):
         t = TEXTOS[self.values[0]]
         v = ModeSelect(self.values[0])
         v.children[0].label = t['btn_craft']
-        v.children[1].label = t['btn_skill']
+        v.children[2].label = t['btn_skill']
         await interaction.response.send_message(t['select_lang'], view=v, ephemeral=True)
 
 class PersistentControlView(ui.View):
