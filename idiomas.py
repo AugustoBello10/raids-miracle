@@ -1,9 +1,7 @@
-# idiomas.py
-
 TEXTOS = {
     "pt": {
         "select_lang": "🇧🇷 Português selecionado.",
-        "select_cat": "Selecione a Categoria...", # <--- A LINHA QUE FALTAVA
+        "select_cat": "Selecione a Categoria...",
         "ask_category": "📂 O que você deseja craftar?",
         "ask_item": "Qual item de **{}**?",
         "modal_title": "Calcular: {}",
@@ -20,6 +18,15 @@ TEXTOS = {
         "cost": "💰 Custo Total",
         "list": "📦 Lista de Compras",
         "footer": "Calculado para {} | Fuso Manaus",
+        
+        # --- NOVOS (SKILLS) ---
+        "btn_craft": "🔨 Crafting",
+        "btn_skill": "⚔️ Calculadora Skills",
+        "skill_title": "Treino: {} ➝ {}",
+        "time_est": "⏳ Tempo Estimado",
+        "hits": "👊 Total de Hits",
+        "weapon": "🗡️ Arma",
+        
         "cats": {
             "relics": "💎 Relíquias",
             "runes": "✨ Runas",
@@ -30,7 +37,7 @@ TEXTOS = {
     },
     "en": {
         "select_lang": "🇺🇸 English selected.",
-        "select_cat": "Select Category...", # <--- A LINHA QUE FALTAVA
+        "select_cat": "Select Category...",
         "ask_category": "📂 What do you want to craft?",
         "ask_item": "Which item from **{}**?",
         "modal_title": "Calculate: {}",
@@ -47,6 +54,15 @@ TEXTOS = {
         "cost": "💰 Total Cost",
         "list": "📦 Shopping List",
         "footer": "Calculated for {} | Timezone Manaus",
+        
+        # --- NEW (SKILLS) ---
+        "btn_craft": "🔨 Crafting",
+        "btn_skill": "⚔️ Skills Calc",
+        "skill_title": "Training: {} ➝ {}",
+        "time_est": "⏳ Estimated Time",
+        "hits": "👊 Total Hits",
+        "weapon": "🗡️ Weapon",
+
         "cats": {
             "relics": "💎 Relics",
             "runes": "✨ Runes",
@@ -57,7 +73,7 @@ TEXTOS = {
     },
     "pl": {
         "select_lang": "🇵🇱 Język polski wybrany.",
-        "select_cat": "Wybierz Kategorię...", # <--- A LINHA QUE FALTAVA
+        "select_cat": "Wybierz Kategorię...",
         "ask_category": "📂 Co chcesz stworzyć?",
         "ask_item": "Który przedmiot z **{}**?",
         "modal_title": "Oblicz: {}",
@@ -74,6 +90,15 @@ TEXTOS = {
         "cost": "💰 Całkowity Koszt",
         "list": "📦 Lista Zakupów",
         "footer": "Obliczono dla {} | Czas Manaus",
+        
+        # --- NOWE (SKILLS) ---
+        "btn_craft": "🔨 Crafting",
+        "btn_skill": "⚔️ Kalkulator Skilli",
+        "skill_title": "Trening: {} ➝ {}",
+        "time_est": "⏳ Przewidywany Czas",
+        "hits": "👊 Całkowite Uderzenia",
+        "weapon": "🗡️ Broń",
+
         "cats": {
             "relics": "💎 Relikty",
             "runes": "✨ Runy",
