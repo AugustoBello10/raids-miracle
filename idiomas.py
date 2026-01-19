@@ -3,6 +3,7 @@
 TEXTOS = {
     "pt": {
         "select_lang": "🇧🇷 Português selecionado.",
+        "select_cat": "Selecione a Categoria...", # <--- A LINHA QUE FALTAVA
         "ask_category": "📂 O que você deseja craftar?",
         "ask_item": "Qual item de **{}**?",
         "modal_title": "Calcular: {}",
@@ -29,6 +30,7 @@ TEXTOS = {
     },
     "en": {
         "select_lang": "🇺🇸 English selected.",
+        "select_cat": "Select Category...", # <--- A LINHA QUE FALTAVA
         "ask_category": "📂 What do you want to craft?",
         "ask_item": "Which item from **{}**?",
         "modal_title": "Calculate: {}",
@@ -55,6 +57,7 @@ TEXTOS = {
     },
     "pl": {
         "select_lang": "🇵🇱 Język polski wybrany.",
+        "select_cat": "Wybierz Kategorię...", # <--- A LINHA QUE FALTAVA
         "ask_category": "📂 Co chcesz stworzyć?",
         "ask_item": "Który przedmiot z **{}**?",
         "modal_title": "Oblicz: {}",
