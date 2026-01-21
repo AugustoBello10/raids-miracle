@@ -67,7 +67,7 @@ def calcular_crafting_detalhado(skill_atual, multiplicador, ingredientes, quanti
         custo_total += qtd * dados['preco']
     return { "chance_sucesso": chance_exibicao, "tentativas_para_meta": round(tentativas, 1), "materiais_necessarios": mat_totais, "custo_total": round(custo_total, 2) }
 
-# --- PARTY SHARE (ESSA FUNÇÃO QUE ESTAVA FALTANDO E CAUSOU O ERRO!) ---
+# --- PARTY SHARE ---
 def calcular_party_range(level):
     min_share = math.floor(level * (2/3))
     max_share = math.floor(level * 1.5)
