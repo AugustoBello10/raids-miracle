@@ -18,11 +18,12 @@ TEXTOS = {
         "btn_craft": "🔨 Crafting", 
         "btn_skill": "⚔️ Skills", 
         "btn_alch": "🧪 Alchemy",
-        "btn_rashid": "🕌 Rashid", # NOVO
+        "btn_rashid": "🕌 Rashid", 
         "time_est": "⏳ Tempo Estimado",
         
-        # RASHID TEXTOS
+        # RASHID TEXTOS (CORRIGIDO AQUI)
         "rashid_title": "🕌 Rashid está em: {}",
+        "rashid_desc": "📍 {}", # Essa linha estava faltando!
         "rashid_map": "🗺️ Ver no Mapa",
         "rashid_error": "❌ Não foi possível localizar o Rashid hoje.",
 
@@ -56,7 +57,11 @@ TEXTOS = {
         
         "btn_craft": "🔨 Crafting", "btn_skill": "⚔️ Skills", "btn_alch": "🧪 Alchemy", "btn_rashid": "🕌 Rashid", "time_est": "⏳ Estimated Time",
 
-        "rashid_title": "🕌 Rashid is at: {}", "rashid_map": "🗺️ View on Map", "rashid_error": "❌ Could not locate Rashid today.",
+        # RASHID EN
+        "rashid_title": "🕌 Rashid is at: {}", 
+        "rashid_desc": "📍 {}", # Adicionado
+        "rashid_map": "🗺️ View on Map", 
+        "rashid_error": "❌ Could not locate Rashid today.",
 
         "alch_select": "⚗️ What to calculate?", "alch_gold": "💰 Gold Convert", "alch_enchant": "✨ Enchant Weapons", "alch_rune": "💎 Rune Overcharge",
         "alch_rune_cat": "📂 Which rune type?", "alch_rune_atk": "⚔️ Attack & Healing", "alch_rune_sup": "🛡️ Support & Fields",
@@ -76,7 +81,11 @@ TEXTOS = {
         
         "btn_craft": "🔨 Crafting", "btn_skill": "⚔️ Skills", "btn_alch": "🧪 Alchemia", "btn_rashid": "🕌 Rashid", "time_est": "⏳ Przewidywany Czas",
 
-        "rashid_title": "🕌 Rashid jest w: {}", "rashid_map": "🗺️ Zobacz na mapie", "rashid_error": "❌ Nie można zlokalizować Rashida.",
+        # RASHID PL
+        "rashid_title": "🕌 Rashid jest w: {}", 
+        "rashid_desc": "📍 {}", # Adicionado
+        "rashid_map": "🗺️ Zobacz na mapie", 
+        "rashid_error": "❌ Nie można zlokalizować Rashida.",
 
         "alch_select": "⚗️ Co obliczyć?", "alch_gold": "💰 Konwersja Złota", "alch_enchant": "✨ Zaklinanie Broni", "alch_rune": "💎 Przeładowanie Run",
         "alch_rune_cat": "📂 Jaki typ runy?", "alch_rune_atk": "⚔️ Ofensywne i Leczące", "alch_rune_sup": "🛡️ Wsparcie i Pola",
