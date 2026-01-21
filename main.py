@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 from discord import app_commands, ui
+# A linha abaixo vai funcionar agora que atualizamos o calculadora.py
 from calculadora import calcular_crafting_detalhado, calcular_tempo_skill, calcular_alchemy_gold, calcular_alchemy_enchant, calcular_alchemy_rune, calcular_party_range
 from itens import RECEITAS, ESTRUTURA_MENU, ARMAS_TREINO, ALCHEMY_DATA, ALCHEMY_MENU_CATS, RASHID_SCHEDULE
 from idiomas import TEXTOS
@@ -21,7 +22,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (V20 Stable) Online"
+def home(): return "Bot Bellão (V21 Final) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -147,7 +148,7 @@ class AlchemyGoldModal(ui.Modal):
             embed.description = f"Convertendo: **{gold_total:,} gp**"
             embed.add_field(name=t['alch_needs'], value=f"🛒 **{res['converters']}x** {t['alch_conv_name']}", inline=True)
             embed.add_field(name=t['cost'], value=f"💰 **{res['custo']:,} gp**", inline=True)
-            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}% (Bonus)", inline=False)
+            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}%", inline=False)
             await interaction.response.send_message(embed=embed, ephemeral=True, view=ResultView())
         except Exception as e: 
             print(f"Erro Gold: {e}")
@@ -439,8 +440,6 @@ class ModeSelect(ui.View):
     async def skills(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(VocationSelect(self.lang))
         await i.response.send_message("Vocation:", view=v, ephemeral=True)
-    
-    # --- RASHID COM LOGICA DE URL ---
     @ui.button(label="🕌 Rashid", style=discord.ButtonStyle.secondary, row=0)
     async def rashid_btn(self, i: discord.Interaction, b: ui.Button):
         agora = datetime.now(FUSO_BRASILIA)
@@ -451,25 +450,22 @@ class ModeSelect(ui.View):
         if info:
             embed = discord.Embed(title=t['rashid_title'].format(info['city']), color=discord.Color.dark_gold())
             desc = t['rashid_desc'].format(info['desc'])
-            if info['url']: # Só adiciona link se existir
-                desc += f"\n\n**[{t['rashid_map']}]({info['url']})**"
+            if info['url']: desc += f"\n\n**[{t['rashid_map']}]({info['url']})**"
             embed.description = desc
             await i.response.send_message(embed=embed, ephemeral=True)
         else:
             await i.response.send_message(t['rashid_error'], ephemeral=True)
-
-    # --- LINHA 2 ---
     @ui.button(label="🛠️ Extras", style=discord.ButtonStyle.primary, row=1)
     async def tools(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(ToolsSelect(self.lang))
         await i.response.send_message(TEXTOS[self.lang]['tools_select'], view=v, ephemeral=True)
-
     @ui.button(label="☕ Apoiar / Donate", style=discord.ButtonStyle.secondary, emoji="💰", row=1)
     async def donate(self, i: discord.Interaction, b: ui.Button):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
         embed.description = "Feito com ❤️ para a comunidade Miracle."
-        embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
-        embed.add_field(name="🪙 Miracle Points/Coins", value="Parcel to: **Dormir pra que**", inline=False)
+        embed.add_field(name="🇧🇷 Pix", value="`seu_email@pix.com`", inline=True)
+        embed.add_field(name="🌎 PayPal", value="[Link](https://livepix.gg/obellao)", inline=True)
+        embed.add_field(name="🪙 Tibia Coins", value="Parcel to: **Obellao**", inline=False)
         await i.response.send_message(embed=embed, ephemeral=True)
 
 class LanguageSelect(ui.Select):
@@ -478,12 +474,7 @@ class LanguageSelect(ui.Select):
         super().__init__(placeholder="Select Language / Idioma...", options=opts)
     async def callback(self, i: discord.Interaction):
         t = TEXTOS[self.values[0]]; v = ModeSelect(self.values[0])
-        # Atualiza labels
-        v.children[0].label = t['btn_craft']
-        v.children[1].label = t['btn_alch']
-        v.children[2].label = t['btn_skill']
-        v.children[3].label = t['btn_rashid']
-        v.children[4].label = t['btn_tools'] 
+        v.children[0].label = t['btn_craft']; v.children[1].label = t['btn_alch']; v.children[2].label = t['btn_skill']; v.children[3].label = t['btn_rashid']; v.children[4].label = t['btn_tools']
         await i.response.send_message(t['select_lang'], view=v, ephemeral=True)
 
 class PersistentControlView(ui.View):
