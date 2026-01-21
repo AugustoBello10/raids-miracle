@@ -1,48 +1,21 @@
 import math
 from itens import ALCHEMY_DATA, ALCHEMY_RUNES
 
-# No arquivo calculadora.py
-
-# ... imports ...
-
-# --- ALCHEMY: GOLD CONVERSION (LÓGICA CORRIGIDA V2) ---
+# --- ALCHEMY: GOLD CONVERSION ---
 def calcular_alchemy_gold(skill, gold_total):
-    """
-    Calcula quantos conversores são necessários considerando que a conversão pode falhar.
-    Se falhar, a stack de gold não some, e é preciso clicar novamente (gastando outra carga).
-    """
     dados = ALCHEMY_DATA['converter']
-    
-    # 1. Quantas stacks de 100gp precisamos converter com sucesso?
-    # Se tiver 10.000gp, são 100 stacks. (Arredonda pra cima pra garantir)
     stacks_para_sucesso = math.ceil(gold_total / 100)
+    if stacks_para_sucesso == 0: return {"chance": 0, "converters": 0, "custo": 0, "gold_processado": 0}
     
-    if stacks_para_sucesso == 0:
-        return {"chance": 0, "converters": 0, "custo": 0, "gold_processado": 0}
-
-    # 2. Qual a chance de sucesso por clique?
     chance_pct = dados['base_chance'] + (dados['skill_factor'] * skill)
-    chance_pct = min(chance_pct, 100.0) # Trava em 100%
-    # Garante que a chance decimal seja pelo menos 1% para evitar divisão por zero ou loop infinito
+    chance_pct = min(chance_pct, 100.0)
     chance_decimal = max(chance_pct / 100.0, 0.0001)
-
-    # 3. Quantos cliques totais (tentativas) são necessários na MÉDIA para conseguir converter tudo?
-    # Fórmula de Expectativa Matemática: Tentativas = Sucessos Necessários / Chance Decimal
+    
     total_cliques_necessarios = math.ceil(stacks_para_sucesso / chance_decimal)
-
-    # 4. Quantos conversores são necessários para esses cliques?
-    # Cada conversor tem 100 cargas.
     qtd_ferramentas = math.ceil(total_cliques_necessarios / dados['charges'])
-
-    # 5. Custo total
     custo_total = qtd_ferramentas * dados['cost']
 
-    return {
-        "chance": round(chance_pct, 2),
-        "converters": qtd_ferramentas,
-        "custo": custo_total,
-        "gold_processado": gold_total
-    }
+    return { "chance": round(chance_pct, 2), "converters": qtd_ferramentas, "custo": custo_total, "gold_processado": gold_total }
 
 # --- ALCHEMY: CRYSTAL ENCHANT ---
 def calcular_alchemy_enchant(skill, crystal_base_chance):
@@ -62,7 +35,7 @@ def calcular_alchemy_rune(skill, rune_name):
     chance = min(chance, 100.0)
     return { "possivel": True, "min_skill": rune_info['min'], "chance": round(chance, 2), "pro": rune_info['pro'] }
 
-# --- SKILLS (CALCULADORA DE TREINO) ---
+# --- SKILLS ---
 def calcular_tempo_skill(vocacao, tipo_skill, atual, pct_atual, alvo, intervalo_ataque=2.0):
     vocacao = vocacao.lower(); tipo_skill = tipo_skill.lower()
     CONSTANTES = { 'knight': {'melee': 50, 'distance': 140, 'shielding': 100}, 'paladin': {'melee': 120, 'distance': 25, 'shielding': 100}, 'druid': {'melee': 200, 'distance': 200, 'shielding': 100}, 'sorcerer': {'melee': 200, 'distance': 200, 'shielding': 100} }
@@ -79,7 +52,7 @@ def calcular_tempo_skill(vocacao, tipo_skill, atual, pct_atual, alvo, intervalo_
     minutos = int(restante // 60); segundos = int(restante % 60)
     return { "dias": dias, "horas": horas, "minutos": minutos, "segundos": segundos, "hits": int(hits_totais) }
 
-# --- CRAFTING (A FUNÇÃO QUE ESTAVA FALTANDO!) ---
+# --- CRAFTING ---
 def calcular_crafting_detalhado(skill_atual, multiplicador, ingredientes, quantidade_desejada=1):
     chance_real = 10 + ((skill_atual - 10) * multiplicador)
     chance_exibicao = min(chance_real, 100)
@@ -94,3 +67,8 @@ def calcular_crafting_detalhado(skill_atual, multiplicador, ingredientes, quanti
         custo_total += qtd * dados['preco']
     return { "chance_sucesso": chance_exibicao, "tentativas_para_meta": round(tentativas, 1), "materiais_necessarios": mat_totais, "custo_total": round(custo_total, 2) }
 
+# --- PARTY SHARE (ESSA FUNÇÃO QUE ESTAVA FALTANDO E CAUSOU O ERRO!) ---
+def calcular_party_range(level):
+    min_share = math.floor(level * (2/3))
+    max_share = math.floor(level * 1.5)
+    return min_share, max_share
