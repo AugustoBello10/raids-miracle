@@ -21,7 +21,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Fix Rashid V19) Online"
+def home(): return "Bot Bellão (V20 Stable) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -147,7 +147,7 @@ class AlchemyGoldModal(ui.Modal):
             embed.description = f"Convertendo: **{gold_total:,} gp**"
             embed.add_field(name=t['alch_needs'], value=f"🛒 **{res['converters']}x** {t['alch_conv_name']}", inline=True)
             embed.add_field(name=t['cost'], value=f"💰 **{res['custo']:,} gp**", inline=True)
-            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}%", inline=False)
+            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}% (Bonus)", inline=False)
             await interaction.response.send_message(embed=embed, ephemeral=True, view=ResultView())
         except Exception as e: 
             print(f"Erro Gold: {e}")
@@ -432,16 +432,14 @@ class ModeSelect(ui.View):
     async def craft(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(CategorySelect(self.lang))
         await i.response.send_message(TEXTOS[self.lang]['select_cat'], view=v, ephemeral=True)
-    
     @ui.button(label="🧪 Alchemy", style=discord.ButtonStyle.success, row=0)
     async def alchemy(self, i: discord.Interaction, b: ui.Button):
         await i.response.send_message(TEXTOS[self.lang]['alch_select'], view=AlchemySelect(self.lang), ephemeral=True)
-    
     @ui.button(label="⚔️ Skills", style=discord.ButtonStyle.danger, row=0)
     async def skills(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(VocationSelect(self.lang))
         await i.response.send_message("Vocation:", view=v, ephemeral=True)
-
+    
     # --- RASHID COM LOGICA DE URL ---
     @ui.button(label="🕌 Rashid", style=discord.ButtonStyle.secondary, row=0)
     async def rashid_btn(self, i: discord.Interaction, b: ui.Button):
@@ -450,16 +448,11 @@ class ModeSelect(ui.View):
         dia_semana = agora.weekday()
         info = RASHID_SCHEDULE.get(dia_semana)
         t = TEXTOS[self.lang]
-        
         if info:
             embed = discord.Embed(title=t['rashid_title'].format(info['city']), color=discord.Color.dark_gold())
-            # Monta descrição
             desc = t['rashid_desc'].format(info['desc'])
-            
-            # Só adiciona o link se existir URL (não for None)
-            if info['url']:
+            if info['url']: # Só adiciona link se existir
                 desc += f"\n\n**[{t['rashid_map']}]({info['url']})**"
-            
             embed.description = desc
             await i.response.send_message(embed=embed, ephemeral=True)
         else:
@@ -475,8 +468,8 @@ class ModeSelect(ui.View):
     async def donate(self, i: discord.Interaction, b: ui.Button):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
         embed.description = "Feito com ❤️ para a comunidade Miracle."
-      embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
-        embed.add_field(name="🪙 Miracle Coins", value="Parcel to: **Dormir pra que**", inline=False)
+        embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
+        embed.add_field(name="🪙 Miracle Points/Coins", value="Parcel to: **Dormir pra que**", inline=False)
         await i.response.send_message(embed=embed, ephemeral=True)
 
 class LanguageSelect(ui.Select):
@@ -525,7 +518,6 @@ async def checar_raids(interaction: discord.Interaction):
             txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
         await interaction.followup.send(txt)
 
-# Atualizei o comando de texto tambem para respeitar a logica do link
 @bot.tree.command(name="rashid", description="Onde está o Rashid hoje?")
 async def rashid(interaction: discord.Interaction):
     agora = datetime.now(FUSO_BRASILIA)
@@ -534,12 +526,8 @@ async def rashid(interaction: discord.Interaction):
     info = RASHID_SCHEDULE.get(dia_semana)
     if info:
         embed = discord.Embed(title=f"🕌 Rashid está em: {info['city']}", color=discord.Color.dark_gold())
-        
-        # Logica do Link aqui tambem
         desc_txt = f"📍 {info['desc']}"
-        if info['url']:
-            desc_txt += f"\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
-            
+        if info['url']: desc_txt += f"\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
         embed.description = desc_txt
         await interaction.response.send_message(embed=embed)
     else:
