@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 from discord import app_commands, ui
-from calculadora import calcular_crafting_detalhado, calcular_tempo_skill, calcular_alchemy_gold, calcular_alchemy_enchant, calcular_alchemy_rune
+from calculadora import calcular_crafting_detalhado, calcular_tempo_skill, calcular_alchemy_gold, calcular_alchemy_enchant, calcular_alchemy_rune, calcular_party_range
 from itens import RECEITAS, ESTRUTURA_MENU, ARMAS_TREINO, ALCHEMY_DATA, ALCHEMY_MENU_CATS, RASHID_SCHEDULE
 from idiomas import TEXTOS
 
@@ -21,7 +21,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Rashid Button V16) Online"
+def home(): return "Bot Bellão (Fix Rashid V19) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -76,6 +76,52 @@ class ResultView(ui.View):
         await interaction.response.send_message("🇧🇷 🇺🇸 🇵🇱 Selecione / Select:", view=v, ephemeral=True)
 
 # ==========================================
+# 🛠️ NOVAS FERRAMENTAS (PARTY & SS)
+# ==========================================
+
+class PartyShareModal(ui.Modal):
+    def __init__(self, lang):
+        self.lang = lang; t = TEXTOS[lang]
+        super().__init__(title=t['party_title'])
+        self.add_item(ui.TextInput(label=t['party_label'], placeholder="Ex: 80", custom_id="lvl", max_length=4))
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            level = int(self.children[0].value)
+            min_lvl, max_lvl = calcular_party_range(level)
+            t = TEXTOS[self.lang]
+            
+            embed = discord.Embed(title=t['party_title'], color=discord.Color.green())
+            embed.description = t['party_res'].format(level)
+            embed.add_field(name="Min Level 📉", value=f"**{min_lvl}**", inline=True)
+            embed.add_field(name="Max Level 📈", value=f"**{max_lvl}**", inline=True)
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True, view=ResultView())
+        except: await interaction.response.send_message("❌ Error: Number required.", ephemeral=True)
+
+class ToolsSelect(ui.View):
+    def __init__(self, lang): super().__init__(timeout=None); self.lang = lang
+    
+    @ui.button(label="🤝 Party Share", style=discord.ButtonStyle.primary)
+    async def party(self, i: discord.Interaction, b: ui.Button):
+        await i.response.send_modal(PartyShareModal(self.lang))
+
+    @ui.button(label="💾 Server Save", style=discord.ButtonStyle.danger)
+    async def ss(self, i: discord.Interaction, b: ui.Button):
+        agora = datetime.now(FUSO_BRASILIA)
+        target = agora.replace(hour=5, minute=0, second=0, microsecond=0)
+        if agora.hour >= 5: target += timedelta(days=1)
+        
+        diff = target - agora
+        h, m = int(diff.total_seconds()//3600), int((diff.total_seconds()%3600)//60)
+        tempo_str = f"{h}h {m}m"
+        
+        t = TEXTOS[self.lang]
+        embed = discord.Embed(title=t['ss_title'], color=discord.Color.red())
+        embed.description = t['ss_msg'].format(tempo_str)
+        await i.response.send_message(embed=embed, ephemeral=True, view=ResultView())
+
+# ==========================================
 # 🧪 SISTEMA ALCHEMY
 # ==========================================
 
@@ -101,7 +147,7 @@ class AlchemyGoldModal(ui.Modal):
             embed.description = f"Convertendo: **{gold_total:,} gp**"
             embed.add_field(name=t['alch_needs'], value=f"🛒 **{res['converters']}x** {t['alch_conv_name']}", inline=True)
             embed.add_field(name=t['cost'], value=f"💰 **{res['custo']:,} gp**", inline=True)
-            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}% (Bonus)", inline=False)
+            embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}%", inline=False)
             await interaction.response.send_message(embed=embed, ephemeral=True, view=ResultView())
         except Exception as e: 
             print(f"Erro Gold: {e}")
@@ -396,7 +442,7 @@ class ModeSelect(ui.View):
         v = ui.View(timeout=None); v.add_item(VocationSelect(self.lang))
         await i.response.send_message("Vocation:", view=v, ephemeral=True)
 
-    # --- BOTÃO RASHID ADICIONADO AQUI ---
+    # --- RASHID COM LOGICA DE URL ---
     @ui.button(label="🕌 Rashid", style=discord.ButtonStyle.secondary, row=0)
     async def rashid_btn(self, i: discord.Interaction, b: ui.Button):
         agora = datetime.now(FUSO_BRASILIA)
@@ -407,16 +453,29 @@ class ModeSelect(ui.View):
         
         if info:
             embed = discord.Embed(title=t['rashid_title'].format(info['city']), color=discord.Color.dark_gold())
-            embed.description = f"{t['rashid_desc'].format(info['desc'])}\n\n**[{t['rashid_map']}]({info['url']})**"
+            # Monta descrição
+            desc = t['rashid_desc'].format(info['desc'])
+            
+            # Só adiciona o link se existir URL (não for None)
+            if info['url']:
+                desc += f"\n\n**[{t['rashid_map']}]({info['url']})**"
+            
+            embed.description = desc
             await i.response.send_message(embed=embed, ephemeral=True)
         else:
             await i.response.send_message(t['rashid_error'], ephemeral=True)
+
+    # --- LINHA 2 ---
+    @ui.button(label="🛠️ Extras", style=discord.ButtonStyle.primary, row=1)
+    async def tools(self, i: discord.Interaction, b: ui.Button):
+        v = ui.View(timeout=None); v.add_item(ToolsSelect(self.lang))
+        await i.response.send_message(TEXTOS[self.lang]['tools_select'], view=v, ephemeral=True)
 
     @ui.button(label="☕ Apoiar / Donate", style=discord.ButtonStyle.secondary, emoji="💰", row=1)
     async def donate(self, i: discord.Interaction, b: ui.Button):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
         embed.description = "Feito com ❤️ para a comunidade Miracle."
-        embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
+      embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
         embed.add_field(name="🪙 Miracle Coins", value="Parcel to: **Dormir pra que**", inline=False)
         await i.response.send_message(embed=embed, ephemeral=True)
 
@@ -426,11 +485,12 @@ class LanguageSelect(ui.Select):
         super().__init__(placeholder="Select Language / Idioma...", options=opts)
     async def callback(self, i: discord.Interaction):
         t = TEXTOS[self.values[0]]; v = ModeSelect(self.values[0])
-        # Atualiza labels dos 4 botões da fila 0
+        # Atualiza labels
         v.children[0].label = t['btn_craft']
         v.children[1].label = t['btn_alch']
         v.children[2].label = t['btn_skill']
-        v.children[3].label = t['btn_rashid'] # Traduz Rashid
+        v.children[3].label = t['btn_rashid']
+        v.children[4].label = t['btn_tools'] 
         await i.response.send_message(t['select_lang'], view=v, ephemeral=True)
 
 class PersistentControlView(ui.View):
@@ -465,7 +525,7 @@ async def checar_raids(interaction: discord.Interaction):
             txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
         await interaction.followup.send(txt)
 
-# Mantive o comando /rashid também, caso alguém prefira digitar
+# Atualizei o comando de texto tambem para respeitar a logica do link
 @bot.tree.command(name="rashid", description="Onde está o Rashid hoje?")
 async def rashid(interaction: discord.Interaction):
     agora = datetime.now(FUSO_BRASILIA)
@@ -474,7 +534,13 @@ async def rashid(interaction: discord.Interaction):
     info = RASHID_SCHEDULE.get(dia_semana)
     if info:
         embed = discord.Embed(title=f"🕌 Rashid está em: {info['city']}", color=discord.Color.dark_gold())
-        embed.description = f"📍 {info['desc']}\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
+        
+        # Logica do Link aqui tambem
+        desc_txt = f"📍 {info['desc']}"
+        if info['url']:
+            desc_txt += f"\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
+            
+        embed.description = desc_txt
         await interaction.response.send_message(embed=embed)
     else:
         await interaction.response.send_message("❌ Erro ao localizar Rashid.")
