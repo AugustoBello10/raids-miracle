@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 from discord import app_commands, ui
-# A linha abaixo vai funcionar agora que atualizamos o calculadora.py
 from calculadora import calcular_crafting_detalhado, calcular_tempo_skill, calcular_alchemy_gold, calcular_alchemy_enchant, calcular_alchemy_rune, calcular_party_range
 from itens import RECEITAS, ESTRUTURA_MENU, ARMAS_TREINO, ALCHEMY_DATA, ALCHEMY_MENU_CATS, RASHID_SCHEDULE
 from idiomas import TEXTOS
@@ -22,7 +21,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (V21 Final) Online"
+def home(): return "Bot Bellão (V22 Final) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -463,9 +462,8 @@ class ModeSelect(ui.View):
     async def donate(self, i: discord.Interaction, b: ui.Button):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
         embed.description = "Feito com ❤️ para a comunidade Miracle."
-        embed.add_field(name="🇧🇷 Pix", value="`seu_email@pix.com`", inline=True)
-        embed.add_field(name="🌎 PayPal", value="[Link](https://livepix.gg/obellao)", inline=True)
-        embed.add_field(name="🪙 Tibia Coins", value="Parcel to: **Obellao**", inline=False)
+        embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
+        embed.add_field(name="🪙 Miracle Coins", value="Parcel to: **Dormir pra que / Carlin**", inline=False)
         await i.response.send_message(embed=embed, ephemeral=True)
 
 class LanguageSelect(ui.Select):
