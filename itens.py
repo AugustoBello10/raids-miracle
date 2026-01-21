@@ -28,10 +28,7 @@ ALCHEMY_DATA = {
     }
 }
 
-# --- NOVO: RUNE OVERCHARGING DATA ---
-# Formato: "Nome": {min_skill, base_chance, pro (True se precisa de Alchemist)}
 ALCHEMY_RUNES = {
-    # ATK & HEALING
     "Sudden Death":         {"min": 55, "base": 22.72, "pro": True},
     "Explosion":            {"min": 28, "base": 27.77, "pro": True},
     "Great Fireball":       {"min": 22, "base": 41.66, "pro": False},
@@ -42,8 +39,6 @@ ALCHEMY_RUNES = {
     "Intense Healing":      {"min": 13, "base": 83.33, "pro": False},
     "Antidote Rune":        {"min": 10, "base": 100.0, "pro": False},
     "Envenom":              {"min": 22, "base": 50.0,  "pro": False},
-    
-    # SUPPORT & FIELDS
     "Paralyze":             {"min": 64, "base": 8.33,  "pro": True},
     "Magic Wall":           {"min": 37, "base": 20.0,  "pro": True},
     "Energy Bomb":          {"min": 40, "base": 22.72, "pro": False},
@@ -63,7 +58,6 @@ ALCHEMY_RUNES = {
     "Destroy Field":        {"min": 19, "base": 83.33, "pro": False},
 }
 
-# --- CATEGORIAS PARA O MENU DO DISCORD (Limite de 25) ---
 ALCHEMY_MENU_CATS = {
     "cat_atk": ["Sudden Death", "Explosion", "Great Fireball", "Heavy Magic Missile", "Light Magic Missile", "Fireball", "Ultimate Healing", "Intense Healing", "Antidote Rune", "Envenom"],
     "cat_sup": ["Paralyze", "Magic Wall", "Energy Bomb", "Energy Wall", "Energy Field", "Fire Bomb", "Fire Wall", "Fire Field", "Poison Bomb", "Poison Wall", "Poison Field", "Soulfire", "Animate Dead", "Convince Creature", "Chameleon", "Desintegrate", "Destroy Field"]
@@ -100,4 +94,16 @@ ESTRUTURA_MENU = {
         "fishing": ["Engineered Fishing Rod", "Golden Fishing Rod", "Reinforced Rod", "Volcanic Fishing Rod"],
         "ammo": ["10x Steel Bolts"]
     }
+}
+
+# --- RASHID SCHEDULE (NOVO) ---
+# 0=Seg, 1=Ter, 2=Qua...
+RASHID_SCHEDULE = {
+    0: {"city": "Thais", "desc": "Ao lado direito do DP.", "url": "https://tibiamaps.io/map#32359,32226,6:3"},
+    1: {"city": "Venore", "desc": "Loja ao sul/direita do DP.", "url": "https://tibiamaps.io/map#32945,32110,6:3"},
+    2: {"city": "Ab'Dendriel", "desc": "Na taverna.", "url": "https://tibiamaps.io/map#32660,31683,7:3"},
+    3: {"city": "Ankrahmun", "desc": "Acima do Post Office.", "url": "https://tibiamaps.io/map#33069,32882,6:4"},
+    4: {"city": "Darashia", "desc": "Na taverna.", "url": "https://tibiamaps.io/map#33235,32485,7:3"},
+    5: {"city": "Edron", "desc": "Na taverna acima do DP.", "url": "https://tibiamaps.io/map#33170,31812,6:3"},
+    6: {"city": "Carlin", "desc": "Primeiro andar do DP.", "url": "https://tibiamaps.io/map#32334,31782,6:3"}
 }
