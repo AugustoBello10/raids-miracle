@@ -21,7 +21,7 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Rashid V15) Online"
+def home(): return "Bot Bellão (Rashid Button V16) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- RAIDS SYSTEM ---
@@ -386,13 +386,32 @@ class ModeSelect(ui.View):
     async def craft(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(CategorySelect(self.lang))
         await i.response.send_message(TEXTOS[self.lang]['select_cat'], view=v, ephemeral=True)
+    
     @ui.button(label="🧪 Alchemy", style=discord.ButtonStyle.success, row=0)
     async def alchemy(self, i: discord.Interaction, b: ui.Button):
         await i.response.send_message(TEXTOS[self.lang]['alch_select'], view=AlchemySelect(self.lang), ephemeral=True)
+    
     @ui.button(label="⚔️ Skills", style=discord.ButtonStyle.danger, row=0)
     async def skills(self, i: discord.Interaction, b: ui.Button):
         v = ui.View(timeout=None); v.add_item(VocationSelect(self.lang))
         await i.response.send_message("Vocation:", view=v, ephemeral=True)
+
+    # --- BOTÃO RASHID ADICIONADO AQUI ---
+    @ui.button(label="🕌 Rashid", style=discord.ButtonStyle.secondary, row=0)
+    async def rashid_btn(self, i: discord.Interaction, b: ui.Button):
+        agora = datetime.now(FUSO_BRASILIA)
+        if agora.hour < 5: agora = agora - timedelta(days=1)
+        dia_semana = agora.weekday()
+        info = RASHID_SCHEDULE.get(dia_semana)
+        t = TEXTOS[self.lang]
+        
+        if info:
+            embed = discord.Embed(title=t['rashid_title'].format(info['city']), color=discord.Color.dark_gold())
+            embed.description = f"{t['rashid_desc'].format(info['desc'])}\n\n**[{t['rashid_map']}]({info['url']})**"
+            await i.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await i.response.send_message(t['rashid_error'], ephemeral=True)
+
     @ui.button(label="☕ Apoiar / Donate", style=discord.ButtonStyle.secondary, emoji="💰", row=1)
     async def donate(self, i: discord.Interaction, b: ui.Button):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
@@ -407,7 +426,11 @@ class LanguageSelect(ui.Select):
         super().__init__(placeholder="Select Language / Idioma...", options=opts)
     async def callback(self, i: discord.Interaction):
         t = TEXTOS[self.values[0]]; v = ModeSelect(self.values[0])
-        v.children[0].label = t['btn_craft']; v.children[1].label = t['btn_alch']; v.children[2].label = t['btn_skill']
+        # Atualiza labels dos 4 botões da fila 0
+        v.children[0].label = t['btn_craft']
+        v.children[1].label = t['btn_alch']
+        v.children[2].label = t['btn_skill']
+        v.children[3].label = t['btn_rashid'] # Traduz Rashid
         await i.response.send_message(t['select_lang'], view=v, ephemeral=True)
 
 class PersistentControlView(ui.View):
@@ -442,16 +465,13 @@ async def checar_raids(interaction: discord.Interaction):
             txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
         await interaction.followup.send(txt)
 
+# Mantive o comando /rashid também, caso alguém prefira digitar
 @bot.tree.command(name="rashid", description="Onde está o Rashid hoje?")
 async def rashid(interaction: discord.Interaction):
     agora = datetime.now(FUSO_BRASILIA)
-    # Se for antes das 5am, ainda conta como o dia anterior
-    if agora.hour < 5:
-        agora = agora - timedelta(days=1)
-    
-    dia_semana = agora.weekday() # 0 = Seg, 6 = Dom
+    if agora.hour < 5: agora = agora - timedelta(days=1)
+    dia_semana = agora.weekday()
     info = RASHID_SCHEDULE.get(dia_semana)
-    
     if info:
         embed = discord.Embed(title=f"🕌 Rashid está em: {info['city']}", color=discord.Color.dark_gold())
         embed.description = f"📍 {info['desc']}\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
