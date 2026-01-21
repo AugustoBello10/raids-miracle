@@ -9,9 +9,8 @@ from datetime import datetime, timedelta
 from flask import Flask
 from threading import Thread
 from discord import app_commands, ui
-# Imports corrigidos para garantir que tudo exista
 from calculadora import calcular_crafting_detalhado, calcular_tempo_skill, calcular_alchemy_gold, calcular_alchemy_enchant, calcular_alchemy_rune
-from itens import RECEITAS, ESTRUTURA_MENU, ARMAS_TREINO, ALCHEMY_DATA, ALCHEMY_MENU_CATS
+from itens import RECEITAS, ESTRUTURA_MENU, ARMAS_TREINO, ALCHEMY_DATA, ALCHEMY_MENU_CATS, RASHID_SCHEDULE
 from idiomas import TEXTOS
 
 TOKEN = os.environ.get('DISCORD_TOKEN') 
@@ -22,10 +21,10 @@ FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão (Fix Full V14) Online"
+def home(): return "Bot Bellão (Rashid V15) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
-# --- RAIDS SYSTEM (MANTIDO) ---
+# --- RAIDS SYSTEM ---
 def carregar_raids():
     try:
         response = requests.get(URL_RAIDS, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
@@ -90,23 +89,19 @@ class AlchemyGoldModal(ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             skill = int(self.children[0].value)
-            # Logica para ler 'k' ou 'kk'
             raw_gold = self.children[1].value.lower().replace('.', '').replace(',', '')
             if 'k' in raw_gold:
                 multiplier = 1000 ** raw_gold.count('k')
                 gold_total = int(float(raw_gold.replace('k', '')) * multiplier)
             else:
                 gold_total = int(raw_gold)
-            
             res = calcular_alchemy_gold(skill, gold_total)
             t = TEXTOS[self.lang]
-            
             embed = discord.Embed(title=t['alch_res_gold'], color=discord.Color.gold())
             embed.description = f"Convertendo: **{gold_total:,} gp**"
             embed.add_field(name=t['alch_needs'], value=f"🛒 **{res['converters']}x** {t['alch_conv_name']}", inline=True)
             embed.add_field(name=t['cost'], value=f"💰 **{res['custo']:,} gp**", inline=True)
             embed.add_field(name=t['alch_chance'], value=f"🍀 {res['chance']}% (Bonus)", inline=False)
-            
             await interaction.response.send_message(embed=embed, ephemeral=True, view=ResultView())
         except Exception as e: 
             print(f"Erro Gold: {e}")
@@ -403,7 +398,7 @@ class ModeSelect(ui.View):
         embed = discord.Embed(title="☕ Apoie o Dev / Support", color=discord.Color.gold())
         embed.description = "Feito com ❤️ para a comunidade Miracle."
         embed.add_field(name="🇧🇷 Pix", value="[Link](https://livepix.gg/obellao)", inline=True)
-        embed.add_field(name="🪙 Miracle Coin/Points", value="Parcel to: **Dormir pra que**", inline=False)
+        embed.add_field(name="🪙 Miracle Coins", value="Parcel to: **Dormir pra que**", inline=False)
         await i.response.send_message(embed=embed, ephemeral=True)
 
 class LanguageSelect(ui.Select):
@@ -422,7 +417,6 @@ class PersistentControlView(ui.View):
         v = ui.View(timeout=None); v.add_item(LanguageSelect())
         await i.response.send_message("🇧🇷 🇺🇸 🇵🇱", view=v, ephemeral=True)
 
-# --- BOT ---
 class MyBot(discord.Client):
     def __init__(self): super().__init__(intents=discord.Intents.all()); self.tree = app_commands.CommandTree(self)
     async def setup_hook(self): self.add_view(PersistentControlView()); await self.tree.sync()
@@ -447,6 +441,23 @@ async def checar_raids(interaction: discord.Interaction):
             h, m = int(d.total_seconds()//3600), int((d.total_seconds()%3600)//60)
             txt += f"• **{r['nome']}** em {h}h {m}m ({r['proxima'].strftime('%d/%m %H:%M')})\n"
         await interaction.followup.send(txt)
+
+@bot.tree.command(name="rashid", description="Onde está o Rashid hoje?")
+async def rashid(interaction: discord.Interaction):
+    agora = datetime.now(FUSO_BRASILIA)
+    # Se for antes das 5am, ainda conta como o dia anterior
+    if agora.hour < 5:
+        agora = agora - timedelta(days=1)
+    
+    dia_semana = agora.weekday() # 0 = Seg, 6 = Dom
+    info = RASHID_SCHEDULE.get(dia_semana)
+    
+    if info:
+        embed = discord.Embed(title=f"🕌 Rashid está em: {info['city']}", color=discord.Color.dark_gold())
+        embed.description = f"📍 {info['desc']}\n\n🗺️ **[Clique aqui para ver no Mapa]({info['url']})**"
+        await interaction.response.send_message(embed=embed)
+    else:
+        await interaction.response.send_message("❌ Erro ao localizar Rashid.")
 
 if __name__ == "__main__":
     if TOKEN:
