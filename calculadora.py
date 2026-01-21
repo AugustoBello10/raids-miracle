@@ -1,31 +1,44 @@
 import math
 from itens import ALCHEMY_DATA, ALCHEMY_RUNES
 
-# --- ALCHEMY: GOLD CONVERSION ---
+# No arquivo calculadora.py
+
+# ... imports ...
+
+# --- ALCHEMY: GOLD CONVERSION (LÓGICA CORRIGIDA V2) ---
 def calcular_alchemy_gold(skill, gold_total):
     """
-    Calcula quantos converters precisa baseado no total de ouro.
-    1 Clique = Converte 100gp (1 stack).
-    1 Converter = 100 Cargas.
-    Logo, 1 Converter processa 10.000 gp.
+    Calcula quantos conversores são necessários considerando que a conversão pode falhar.
+    Se falhar, a stack de gold não some, e é preciso clicar novamente (gastando outra carga).
     """
     dados = ALCHEMY_DATA['converter']
     
-    # Capacidade de processamento de UM converter (GP)
-    gp_por_converter = dados['charges'] * 100 
+    # 1. Quantas stacks de 100gp precisamos converter com sucesso?
+    # Se tiver 10.000gp, são 100 stacks. (Arredonda pra cima pra garantir)
+    stacks_para_sucesso = math.ceil(gold_total / 100)
     
-    # Quantos converters precisa?
-    qtd_ferramentas = math.ceil(gold_total / gp_por_converter)
-    
-    # Custo total
+    if stacks_para_sucesso == 0:
+        return {"chance": 0, "converters": 0, "custo": 0, "gold_processado": 0}
+
+    # 2. Qual a chance de sucesso por clique?
+    chance_pct = dados['base_chance'] + (dados['skill_factor'] * skill)
+    chance_pct = min(chance_pct, 100.0) # Trava em 100%
+    # Garante que a chance decimal seja pelo menos 1% para evitar divisão por zero ou loop infinito
+    chance_decimal = max(chance_pct / 100.0, 0.0001)
+
+    # 3. Quantos cliques totais (tentativas) são necessários na MÉDIA para conseguir converter tudo?
+    # Fórmula de Expectativa Matemática: Tentativas = Sucessos Necessários / Chance Decimal
+    total_cliques_necessarios = math.ceil(stacks_para_sucesso / chance_decimal)
+
+    # 4. Quantos conversores são necessários para esses cliques?
+    # Cada conversor tem 100 cargas.
+    qtd_ferramentas = math.ceil(total_cliques_necessarios / dados['charges'])
+
+    # 5. Custo total
     custo_total = qtd_ferramentas * dados['cost']
-    
-    # Chance (Informativa)
-    chance = dados['base_chance'] + (dados['skill_factor'] * skill)
-    chance = min(chance, 100.0)
-    
+
     return {
-        "chance": round(chance, 2),
+        "chance": round(chance_pct, 2),
         "converters": qtd_ferramentas,
         "custo": custo_total,
         "gold_processado": gold_total
@@ -80,3 +93,4 @@ def calcular_crafting_detalhado(skill_atual, multiplicador, ingredientes, quanti
         mat_totais[nome] = qtd
         custo_total += qtd * dados['preco']
     return { "chance_sucesso": chance_exibicao, "tentativas_para_meta": round(tentativas, 1), "materiais_necessarios": mat_totais, "custo_total": round(custo_total, 2) }
+
