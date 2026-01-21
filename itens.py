@@ -96,12 +96,12 @@ ESTRUTURA_MENU = {
     }
 }
 
-# --- RASHID SCHEDULE (NOVO) ---
-# 0=Seg, 1=Ter, 2=Qua...
+# --- RASHID SCHEDULE (CORRIGIDO) ---
+# Se URL for None, o bot não mostra o link
 RASHID_SCHEDULE = {
     0: {"city": "Thais", "desc": "Ao lado direito do DP.", "url": "https://tibiamaps.io/map#32359,32226,6:3"},
     1: {"city": "Venore", "desc": "Loja ao sul/direita do DP.", "url": "https://tibiamaps.io/map#32945,32110,6:3"},
-    2: {"city": "Ab'Dendriel", "desc": "Na taverna.", "url": "https://tibiamaps.io/map#32660,31683,7:3"},
+    2: {"city": "Ab'Dendriel", "desc": "Na taverna.", "url": None}, # <-- URL REMOVIDA AQUI
     3: {"city": "Ankrahmun", "desc": "Acima do Post Office.", "url": "https://tibiamaps.io/map#33069,32882,6:4"},
     4: {"city": "Darashia", "desc": "Na taverna.", "url": "https://tibiamaps.io/map#33235,32485,7:3"},
     5: {"city": "Edron", "desc": "Na taverna acima do DP.", "url": "https://tibiamaps.io/map#33170,31812,6:3"},
