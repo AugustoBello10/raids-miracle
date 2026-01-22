@@ -1,14 +1,10 @@
 import discord
 import requests
 import pytz
-import time
-import os
-import math
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from flask import Flask
-from threading import Thread
 from discord import app_commands, ui
 from calculadora import *
 from itens import *
@@ -17,69 +13,31 @@ from idiomas import TEXTOS
 TOKEN = os.environ.get('DISCORD_TOKEN') 
 FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
-# Headers reforçados para evitar bloqueio do site
+# Headers simples apenas para a Wiki do Tibia (que não bloqueia)
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9,pt;q=0.8',
-    'Referer': 'https://miracle74.com/'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 }
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão V30 Stable Online"
+def home(): return "Bot Bellão V31 (Clean) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
-# --- MEMÓRIA DOS ITENS ---
-ITEM_ID_MAP = {}
-
-def indexar_itens_miracle():
-    """Tenta indexar itens. Se falhar, imprime erro no log do Render."""
-    global ITEM_ID_MAP
-    print(">>> INICIANDO INDEXAÇÃO DE ITENS MIRACLE...")
-    try:
-        cats = ["helmets", "armors", "legs", "boots", "shields", "swords", "axes", "clubs", "distance", "wands", "rods", "amulets", "rings", "runes", "tools"]
-        total = 0
-        for cat in cats:
-            url = f"{MIRACLE_ITEMS_URL}&category={cat}"
-            try:
-                # verify=False ajuda caso o SSL do site seja antigo
-                resp = requests.get(url, headers=HEADERS, timeout=15, verify=False)
-                if resp.status_code == 200:
-                    soup = BeautifulSoup(resp.text, 'html.parser')
-                    # Busca links que tenham id=NUMERO
-                    for link in soup.find_all('a', href=True):
-                        m = re.search(r'id=(\d+)', link['href'])
-                        if m:
-                            nome_limpo = link.text.strip().lower()
-                            if nome_limpo:
-                                ITEM_ID_MAP[nome_limpo] = m.group(1)
-                                total += 1
-            except Exception as e_cat:
-                print(f"Erro ao ler categoria {cat}: {e_cat}")
-        
-        # Adiciona manualmente alguns itens essenciais caso a indexação falhe
-        if "fire sword" not in ITEM_ID_MAP: ITEM_ID_MAP["fire sword"] = "2392"
-        if "dragon shield" not in ITEM_ID_MAP: ITEM_ID_MAP["dragon shield"] = "2516"
-        
-        print(f">>> INDEXAÇÃO CONCLUÍDA: {total} itens encontrados.")
-    except Exception as e: 
-        print(f"Erro fatal indexação: {e}")
-
+# --- BOT SETUP ---
 class MyBot(discord.Client):
     def __init__(self):
         super().__init__(intents=discord.Intents.all())
         self.tree = app_commands.CommandTree(self)
     async def setup_hook(self):
         self.add_view(PersistentControlView())
-        Thread(target=indexar_itens_miracle, daemon=True).start()
         await self.tree.sync()
 
 bot = MyBot()
 
-# --- SCRAPERS ---
+# --- SCRAPER MONSTROS (MANTIDO E OTIMIZADO) ---
 def buscar_wiki_monster(nome):
     try:
+        # Busca no TibiaWiki Brasileiro
         url = f"{WIKI_MONSTER_URL}{nome.replace(' ', '_').title()}"
         resp = requests.get(url, headers=HEADERS, timeout=5)
         if resp.status_code != 200: return None
@@ -88,98 +46,39 @@ def buscar_wiki_monster(nome):
         
         info = {"hp": "?", "exp": "?", "loot": {}, "url": url}
         
-        # 1. Regex Robusta para HP e XP
-        # Busca "1000 HP" ou "1,000 HP" ou "1.000 HP"
+        # Regex para capturar HP e XP (Ignora formatação bagunçada)
         m_hp = re.search(r'([\d\.,]+)\s*HP', text)
         if m_hp: info['hp'] = m_hp.group(1)
         
         m_exp = re.search(r'([\d\.,]+)\s*XP', text)
         if m_exp: info['exp'] = m_exp.group(1)
 
-        # 2. Loot Parser V2 (Mais inteligente)
-        # Procura as seções exatas
-        loot_sections = [
-            ("Muito Raro:", ["Durante", "História", "Notas"]),
-            ("Raro:", ["Muito Raro:", "Durante"]),
-            ("Semi-Raro:", ["Raro:", "Muito Raro:"]),
-            ("Incomum:", ["Semi-Raro:", "Raro:"]),
-            ("Comum:", ["Incomum:", "Semi-Raro:"])
-        ]
-        
-        # Faz a busca inversa (do mais raro pro comum) para garantir limites
-        full_text = soup.get_text(" ", strip=True) # Remove quebras de linha estranhas
-        
-        # Procura a string "Loot:" para começar a busca dali pra frente
+        # Loot Parser Inteligente
+        # Procura as seções de loot de baixo para cima para não misturar
+        full_text = soup.get_text(" ", strip=True)
         start_loot = full_text.find("Loot:")
+        
         if start_loot != -1:
             loot_text = full_text[start_loot:]
-            
-            # Extrai cada categoria
             cats_to_find = ["Comum:", "Incomum:", "Semi-Raro:", "Raro:", "Muito Raro:"]
+            
             for i, cat in enumerate(cats_to_find):
                 if cat in loot_text:
-                    # Onde começa esta categoria
                     idx_start = loot_text.find(cat) + len(cat)
+                    # O fim é o início da próxima categoria existente ou seções finais
+                    possible_ends = []
+                    for next_cat in cats_to_find[i+1:] + ["Durante", "Eventos", "História"]:
+                        f = loot_text.find(next_cat, idx_start)
+                        if f != -1: possible_ends.append(f)
                     
-                    # Onde termina? No inicio da proxima categoria existente
-                    idx_end = len(loot_text)
-                    for next_cat in cats_to_find[i+1:] + ["Durante", "Eventos"]:
-                        tmp_idx = loot_text.find(next_cat, idx_start)
-                        if tmp_idx != -1 and tmp_idx < idx_end:
-                            idx_end = tmp_idx
+                    idx_end = min(possible_ends) if possible_ends else len(loot_text)
                     
                     items = loot_text[idx_start:idx_end].strip().strip(".,")
-                    if items: info['loot'][cat.replace(":", "")] = items
+                    if items: info['loot'][cat.replace(":", "")] = items[:900] # Limite seguro
 
         return info
     except Exception as e:
         print(f"Erro Monster: {e}")
-        return None
-
-def buscar_vendas_miracle(query):
-    query = query.lower().strip()
-    item_id = ITEM_ID_MAP.get(query)
-    
-    # Se não achou pelo nome, verifica se o usuário digitou o ID direto (ex: "2392")
-    if not item_id and query.isdigit():
-        item_id = query
-        
-    if not item_id: return None
-    
-    try:
-        url = f"{MIRACLE_ITEM_ID_URL}{item_id}"
-        # verify=False para evitar erro de certificado SSL
-        resp = requests.get(url, headers=HEADERS, timeout=8, verify=False) 
-        soup = BeautifulSoup(resp.text, 'html.parser')
-        res = {"buy": [], "sell": [], "url": url, "name": query.title()}
-        
-        # Tenta pegar o nome real da pagina
-        page_title = soup.find('div', class_='BoxContent')
-        if page_title: res['name'] = page_title.get_text().split('\n')[0].strip()
-
-        # Busca Tabelas
-        tables = soup.find_all('table')
-        for table in tables:
-            # Verifica cabeçalho da tabela
-            header = table.find_previous('h2') or table.find_previous('div', class_='TableTitle')
-            if not header: continue
-            header_txt = header.get_text().lower()
-            
-            if "buy from" in header_txt:
-                for row in table.find_all('tr')[1:]:
-                    cols = row.find_all('td')
-                    if len(cols) >= 3:
-                        res['buy'].append(f"👤 {cols[0].text.strip()} ({cols[1].text.strip()}) 💰 {cols[2].text.strip()}")
-            
-            elif "sell to" in header_txt:
-                for row in table.find_all('tr')[1:]:
-                    cols = row.find_all('td')
-                    if len(cols) >= 3:
-                        res['sell'].append(f"🛒 {cols[0].text.strip()} ({cols[1].text.strip()}) 💰 {cols[2].text.strip()}")
-                        
-        return res
-    except Exception as e:
-        print(f"Erro Miracle Item: {e}")
         return None
 
 # ==========================================
@@ -187,66 +86,46 @@ def buscar_vendas_miracle(query):
 # ==========================================
 
 class WikiModal(ui.Modal):
-    def __init__(self, tipo, lang):
-        self.lang = lang; self.tipo = tipo; t = TEXTOS[lang]
-        super().__init__(title=t['btn_wiki'])
+    def __init__(self, lang):
+        self.lang = lang; t = TEXTOS[lang]
+        super().__init__(title=t['wiki_monster'])
         self.add_item(ui.TextInput(label=t['wiki_label'], placeholder=t['wiki_ph']))
 
     async def on_submit(self, interaction: discord.Interaction):
         q = self.children[0].value.strip(); t = TEXTOS[self.lang]
         
-        # Mensagem Efêmera (Só você vê e some)
+        # Ephemeral=True: Só o usuário vê e pode apagar
         await interaction.response.defer(ephemeral=True)
         
-        if self.tipo == "monster":
-            data = buscar_wiki_monster(q)
-            if not data: 
-                await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
-            else:
-                emb = discord.Embed(title=f"🐲 {q.title()}", url=data['url'], color=discord.Color.red())
-                emb.add_field(name="❤️ HP", value=f"**{data['hp']}**", inline=True)
-                emb.add_field(name="🔮 XP", value=f"**{data['exp']}**", inline=True)
-                
-                if not data['loot']:
-                    emb.add_field(name="📦 Loot", value="Nenhum ou erro ao ler.", inline=False)
-                else:
-                    for cat, items in data['loot'].items():
-                        emb.add_field(name=f"📦 {cat}", value=items[:1000], inline=False)
-                
-                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
+        data = buscar_wiki_monster(q)
+        if not data: 
+            await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
         else:
-            data = buscar_vendas_miracle(q)
-            if not data: 
-                await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
+            emb = discord.Embed(title=f"🐲 {q.title()}", url=data['url'], color=discord.Color.red())
+            emb.add_field(name="❤️ HP", value=f"**{data['hp']}**", inline=True)
+            emb.add_field(name="🔮 XP", value=f"**{data['exp']}**", inline=True)
+            
+            if not data['loot']:
+                emb.add_field(name="📦 Loot", value="Nenhum ou erro de leitura.", inline=False)
             else:
-                emb = discord.Embed(title=f"🛡️ {data.get('name', q.title())}", url=data['url'], color=discord.Color.blue())
-                
-                if data['buy']: 
-                    chunk = "\n".join(data['buy'][:10])
-                    emb.add_field(name=t['wiki_buy_title'], value=chunk, inline=False)
-                
-                if data['sell']: 
-                    chunk = "\n".join(data['sell'][:10])
-                    emb.add_field(name=t['wiki_sell_title'], value=chunk, inline=False)
-                
-                if not data['buy'] and not data['sell']:
-                    emb.description = "⚠️ Item não encontrado em NPCs (ou erro de leitura do site)."
-                
-                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
+                for cat, items in data['loot'].items():
+                    emb.add_field(name=f"📦 {cat}", value=items, inline=False)
+            
+            # Mostra o resultado e o botão de voltar
+            await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
 
 class WikiSelect(ui.View):
     def __init__(self, lang): 
         super().__init__(timeout=None)
         self.lang = lang
         t = TEXTOS[lang]
+        # Apenas botão de monstro e voltar
         self.children[0].label = t['wiki_monster']
-        self.children[1].label = t['wiki_item']
-        self.children[2].label = "Menu"
+        self.children[1].label = "Menu Principal"
 
     @ui.button(label="Monster", style=discord.ButtonStyle.danger)
-    async def monster(self, i, b): await i.response.send_modal(WikiModal("monster", self.lang))
-    @ui.button(label="Item", style=discord.ButtonStyle.primary)
-    async def item(self, i, b): await i.response.send_modal(WikiModal("item", self.lang))
+    async def monster(self, i, b): await i.response.send_modal(WikiModal(self.lang))
+    
     @ui.button(label="Menu", style=discord.ButtonStyle.secondary)
     async def back(self, i, b): 
         v = ui.View(timeout=None); v.add_item(LanguageSelect())
@@ -300,13 +179,8 @@ class PersistentControlView(ui.View):
 # --- VIEWS AUXILIARES ---
 class ToolsSelect(ui.View):
     def __init__(self, lang): 
-        super().__init__(timeout=None)
-        self.lang = lang
-        t = TEXTOS[lang]
-        self.children[0].label = t['btn_mining']
-        self.children[1].label = t['btn_party']
-        self.children[2].label = t['btn_ss']
-
+        super().__init__(timeout=None); self.lang = lang; t = TEXTOS[lang]
+        self.children[0].label = t['btn_mining']; self.children[1].label = t['btn_party']; self.children[2].label = t['btn_ss']
     @ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def mining(self, i, b):
         v = ui.View(timeout=None); v.add_item(MiningPickSelect(self.lang))
@@ -357,6 +231,14 @@ class AlchemySelect(ui.View):
     def __init__(self, lang): super().__init__(timeout=None); self.lang = lang
     @ui.button(label="💰 Gold Converter", style=discord.ButtonStyle.primary)
     async def gold(self, i, b): await i.response.send_modal(AlchemyGoldModal(self.lang))
+    @ui.button(label="✨ Enchant", style=discord.ButtonStyle.secondary)
+    async def enchant(self, i, b): 
+        v = ui.View(timeout=None); v.add_item(AlchemyEnchantSelect(self.lang))
+        await i.response.send_message("Crystal:", view=v, ephemeral=True)
+    @ui.button(label="💎 Runes", style=discord.ButtonStyle.success)
+    async def runes(self, i, b):
+        v = ui.View(timeout=None); v.add_item(AlchemyRuneCategorySelect(self.lang))
+        await i.response.send_message("Runa:", view=v, ephemeral=True)
 
 class AlchemyGoldModal(ui.Modal):
     def __init__(self, lang):
@@ -369,6 +251,39 @@ class AlchemyGoldModal(ui.Modal):
         res = calcular_alchemy_gold(int(self.children[0].value), int(raw))
         t = TEXTOS[self.lang]
         await i.response.send_message(f"{t['alch_needs']} {res['converters']}x {t['alch_conv_name']}", ephemeral=True)
+
+class AlchemyEnchantSelect(ui.Select):
+    def __init__(self, lang):
+        self.lang = lang; crystals = ALCHEMY_DATA['crystals']
+        opts = [discord.SelectOption(label=n, value=f"{n}|{d['base_chance']}") for n,d in crystals.items()]
+        super().__init__(placeholder="Cristal...", options=opts)
+    async def callback(self, i): await i.response.send_modal(AlchemyEnchantModal(self.values[0].split('|')[0], float(self.values[0].split('|')[1]), self.lang))
+
+class AlchemyEnchantModal(ui.Modal):
+    def __init__(self, n, b, l): super().__init__(title=n); self.n=n; self.b=b; self.l=l; self.add_item(ui.TextInput(label="Skill"))
+    async def on_submit(self, i):
+        res = calcular_alchemy_enchant(int(self.children[0].value), self.b)
+        await i.response.send_message(f"Chance: {res['chance_real']}%", ephemeral=True)
+
+class AlchemyRuneCategorySelect(ui.Select):
+    def __init__(self, lang):
+        super().__init__(placeholder="Categoria..."); self.lang = lang
+        self.add_option(label="Attack", value="cat_atk"); self.add_option(label="Support", value="cat_sup")
+    async def callback(self, i):
+        v = ui.View(timeout=None); v.add_item(AlchemyRuneSelect(self.values[0], self.lang))
+        await i.response.edit_message(view=v)
+
+class AlchemyRuneSelect(ui.Select):
+    def __init__(self, cat, lang):
+        super().__init__(placeholder="Runa..."); self.lang = lang
+        for r in ALCHEMY_MENU_CATS[cat]: self.add_option(label=r, value=r)
+    async def callback(self, i): await i.response.send_modal(AlchemyRuneModal(self.values[0], self.lang))
+
+class AlchemyRuneModal(ui.Modal):
+    def __init__(self, r, l): super().__init__(title=r); self.r=r; self.l=l; self.add_item(ui.TextInput(label="Skill"))
+    async def on_submit(self, i):
+        res = calcular_alchemy_rune(int(self.children[0].value), self.r)
+        await i.response.send_message(f"Chance: {res['chance']}%", ephemeral=True)
 
 class CategorySelect(ui.Select):
     def __init__(self, lang):
