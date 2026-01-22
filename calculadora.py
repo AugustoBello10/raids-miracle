@@ -1,5 +1,5 @@
 import math
-from itens import ALCHEMY_DATA, ALCHEMY_RUNES
+from itens import ALCHEMY_DATA, ALCHEMY_RUNES, MINING_PICKS
 
 # --- ALCHEMY: GOLD CONVERSION ---
 def calcular_alchemy_gold(skill, gold_total):
@@ -72,3 +72,37 @@ def calcular_party_range(level):
     min_share = math.floor(level * (2/3))
     max_share = math.floor(level * 1.5)
     return min_share, max_share
+
+# --- NOVO: MINING CALCULATOR ---
+def calcular_mining(skill, pick_name):
+    """
+    Calcula chance de quebrar rocha e coletar itens.
+    Break: 10% + 0.597% * (Skill-10). Max 50% em Skill 77.
+    Minerals: 2% + 0.1% * Skill.
+    Fragments: 0.5% + 0.025% * Skill.
+    Bonus da Picareta aplicado depois.
+    """
+    pick_stats = MINING_PICKS.get(pick_name, MINING_PICKS["Pick (Normal)"])
+    
+    # 1. Break Chance (Quebrar a rocha)
+    if skill < 10: base_break = 10.0
+    elif skill >= 77: base_break = 50.0
+    else: base_break = 10 + (0.597 * (skill - 10))
+    
+    final_break = base_break + pick_stats['bonus_break']
+    final_break = min(final_break, 100.0)
+
+    # 2. Minerals Chance
+    base_min = 2 + (0.1 * skill)
+    final_min = base_min * (1 + pick_stats['bonus_collect']) # Aplica bonus % (ex: 1.25)
+    
+    # 3. Fragments Chance
+    base_frag = 0.5 + (0.025 * skill)
+    final_frag = base_frag * (1 + pick_stats['bonus_collect'])
+
+    return {
+        "break_chance": round(final_break, 2),
+        "minerals_chance": round(final_min, 2),
+        "fragments_chance": round(final_frag, 2),
+        "pick_used": pick_name
+    }
