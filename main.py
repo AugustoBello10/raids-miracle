@@ -17,44 +17,54 @@ from idiomas import TEXTOS
 TOKEN = os.environ.get('DISCORD_TOKEN') 
 FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
-# Cabeçalho para fingir ser um navegador (Evita bloqueio do site do Miracle)
+# Headers reforçados para evitar bloqueio do site
 HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9,pt;q=0.8',
+    'Referer': 'https://miracle74.com/'
 }
 
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão V29 (Regex+UA) Online"
+def home(): return "Bot Bellão V30 Stable Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- MEMÓRIA DOS ITENS ---
 ITEM_ID_MAP = {}
 
 def indexar_itens_miracle():
-    """Busca itens fingindo ser um navegador para evitar bloqueio 403."""
+    """Tenta indexar itens. Se falhar, imprime erro no log do Render."""
     global ITEM_ID_MAP
-    print("Iniciando indexação dos itens...")
+    print(">>> INICIANDO INDEXAÇÃO DE ITENS MIRACLE...")
     try:
-        # Categorias principais do Miracle
         cats = ["helmets", "armors", "legs", "boots", "shields", "swords", "axes", "clubs", "distance", "wands", "rods", "amulets", "rings", "runes", "tools"]
-        count = 0
+        total = 0
         for cat in cats:
             url = f"{MIRACLE_ITEMS_URL}&category={cat}"
             try:
-                resp = requests.get(url, headers=HEADERS, timeout=10)
+                # verify=False ajuda caso o SSL do site seja antigo
+                resp = requests.get(url, headers=HEADERS, timeout=15, verify=False)
                 if resp.status_code == 200:
                     soup = BeautifulSoup(resp.text, 'html.parser')
-                    for link in soup.find_all('a', href=re.compile(r'id=')):
+                    # Busca links que tenham id=NUMERO
+                    for link in soup.find_all('a', href=True):
                         m = re.search(r'id=(\d+)', link['href'])
-                        if m: 
-                            nome = link.text.strip().lower()
-                            ITEM_ID_MAP[nome] = m.group(1)
-                            count += 1
+                        if m:
+                            nome_limpo = link.text.strip().lower()
+                            if nome_limpo:
+                                ITEM_ID_MAP[nome_limpo] = m.group(1)
+                                total += 1
             except Exception as e_cat:
-                print(f"Erro na categoria {cat}: {e_cat}")
-        print(f"Indexação concluída: {count} itens mapeados com sucesso.")
+                print(f"Erro ao ler categoria {cat}: {e_cat}")
+        
+        # Adiciona manualmente alguns itens essenciais caso a indexação falhe
+        if "fire sword" not in ITEM_ID_MAP: ITEM_ID_MAP["fire sword"] = "2392"
+        if "dragon shield" not in ITEM_ID_MAP: ITEM_ID_MAP["dragon shield"] = "2516"
+        
+        print(f">>> INDEXAÇÃO CONCLUÍDA: {total} itens encontrados.")
     except Exception as e: 
-        print(f"Erro fatal na indexação: {e}")
+        print(f"Erro fatal indexação: {e}")
 
 class MyBot(discord.Client):
     def __init__(self):
@@ -67,90 +77,113 @@ class MyBot(discord.Client):
 
 bot = MyBot()
 
-# --- SCRAPERS CORRIGIDOS ---
+# --- SCRAPERS ---
 def buscar_wiki_monster(nome):
     try:
         url = f"{WIKI_MONSTER_URL}{nome.replace(' ', '_').title()}"
         resp = requests.get(url, headers=HEADERS, timeout=5)
         if resp.status_code != 200: return None
         soup = BeautifulSoup(resp.text, 'html.parser')
-        text_content = soup.get_text() # Pega todo o texto da página para usar Regex
+        text = soup.get_text()
         
-        info = {"hp": "?", "exp": "?", "hab": "Ver na Wiki", "loot": {}, "url": url}
+        info = {"hp": "?", "exp": "?", "loot": {}, "url": url}
         
-        # 1. Regex para pegar HP e XP (Procura números antes de "HP" e "XP")
-        # Ex: "1000 HP" ou "1.000 HP"
-        match_hp = re.search(r'(\d+(?:\.\d+)*)\s*HP', text_content)
-        if match_hp: info['hp'] = match_hp.group(1)
+        # 1. Regex Robusta para HP e XP
+        # Busca "1000 HP" ou "1,000 HP" ou "1.000 HP"
+        m_hp = re.search(r'([\d\.,]+)\s*HP', text)
+        if m_hp: info['hp'] = m_hp.group(1)
         
-        match_exp = re.search(r'(\d+(?:\.\d+)*)\s*XP', text_content)
-        if match_exp: info['exp'] = match_exp.group(1)
+        m_exp = re.search(r'([\d\.,]+)\s*XP', text)
+        if m_exp: info['exp'] = m_exp.group(1)
 
-        # 2. Habilidades (Tenta pegar da Infobox ou seção)
-        # Simplificado para evitar erros de layout, foca no link se falhar
-        hab_section = soup.find('div', id='mw-content-text')
-        if hab_section:
-            # Tenta achar linhas comuns de habilidade
-            if "Habilidades:" in text_content:
-                pass # Lógica complexa, melhor deixar o usuário clicar no link se for detalhado
-
-        # 3. Loot por Categorias (Lógica mantida, funciona bem)
-        loot_cats = ["Comum:", "Incomum:", "Semi-Raro:", "Raro:", "Muito Raro:"]
-        for i, cat in enumerate(loot_cats):
-            if cat in text_content:
-                start = text_content.find(cat) + len(cat)
-                # O fim é a próxima categoria ou "Durante Invasões"
-                next_cat = loot_cats[i+1] if i+1 < len(loot_cats) else "Durante Invasões"
-                end = text_content.find(next_cat)
-                if end == -1: end = text_content.find("Durante Eventos") # Fallback
-                
-                if start != -1 and end != -1:
-                    raw_items = text_content[start:end].strip()
-                    # Limpa quebras de linha excessivas
-                    clean_items = " ".join(raw_items.split())
-                    info['loot'][cat] = clean_items[:900] # Limite do Discord
+        # 2. Loot Parser V2 (Mais inteligente)
+        # Procura as seções exatas
+        loot_sections = [
+            ("Muito Raro:", ["Durante", "História", "Notas"]),
+            ("Raro:", ["Muito Raro:", "Durante"]),
+            ("Semi-Raro:", ["Raro:", "Muito Raro:"]),
+            ("Incomum:", ["Semi-Raro:", "Raro:"]),
+            ("Comum:", ["Incomum:", "Semi-Raro:"])
+        ]
+        
+        # Faz a busca inversa (do mais raro pro comum) para garantir limites
+        full_text = soup.get_text(" ", strip=True) # Remove quebras de linha estranhas
+        
+        # Procura a string "Loot:" para começar a busca dali pra frente
+        start_loot = full_text.find("Loot:")
+        if start_loot != -1:
+            loot_text = full_text[start_loot:]
+            
+            # Extrai cada categoria
+            cats_to_find = ["Comum:", "Incomum:", "Semi-Raro:", "Raro:", "Muito Raro:"]
+            for i, cat in enumerate(cats_to_find):
+                if cat in loot_text:
+                    # Onde começa esta categoria
+                    idx_start = loot_text.find(cat) + len(cat)
+                    
+                    # Onde termina? No inicio da proxima categoria existente
+                    idx_end = len(loot_text)
+                    for next_cat in cats_to_find[i+1:] + ["Durante", "Eventos"]:
+                        tmp_idx = loot_text.find(next_cat, idx_start)
+                        if tmp_idx != -1 and tmp_idx < idx_end:
+                            idx_end = tmp_idx
+                    
+                    items = loot_text[idx_start:idx_end].strip().strip(".,")
+                    if items: info['loot'][cat.replace(":", "")] = items
 
         return info
     except Exception as e:
-        print(f"Erro Wiki Monster: {e}")
+        print(f"Erro Monster: {e}")
         return None
 
-def buscar_vendas_miracle(item_name):
-    # Tenta achar o ID pelo nome (insensível a maiúsculas)
-    item_id = ITEM_ID_MAP.get(item_name.lower())
+def buscar_vendas_miracle(query):
+    query = query.lower().strip()
+    item_id = ITEM_ID_MAP.get(query)
     
-    # Se não achou, tenta recarregar indexação rápido (caso tenha ligado agora)
-    if not item_id: 
-        return None
+    # Se não achou pelo nome, verifica se o usuário digitou o ID direto (ex: "2392")
+    if not item_id and query.isdigit():
+        item_id = query
+        
+    if not item_id: return None
     
     try:
         url = f"{MIRACLE_ITEM_ID_URL}{item_id}"
-        resp = requests.get(url, headers=HEADERS, timeout=5)
+        # verify=False para evitar erro de certificado SSL
+        resp = requests.get(url, headers=HEADERS, timeout=8, verify=False) 
         soup = BeautifulSoup(resp.text, 'html.parser')
-        res = {"buy": [], "sell": [], "url": url}
+        res = {"buy": [], "sell": [], "url": url, "name": query.title()}
         
-        # Procura H2 headers que contenham "Buy From" ou "Sell To"
-        for h2 in soup.find_all('h2'):
-            txt = h2.text.lower()
-            if "buy from" in txt:
-                table = h2.find_next('table')
-                if table:
-                    for row in table.find_all('tr')[1:]:
-                        c = row.find_all('td')
-                        if len(c) >= 3: res['buy'].append(f"👤 **{c[0].text}** ({c[1].text}) 💰 {c[2].text}")
-            elif "sell to" in txt:
-                table = h2.find_next('table')
-                if table:
-                    for row in table.find_all('tr')[1:]:
-                        c = row.find_all('td')
-                        if len(c) >= 3: res['sell'].append(f"🛒 **{c[0].text}** ({c[1].text}) 💰 {c[2].text}")
+        # Tenta pegar o nome real da pagina
+        page_title = soup.find('div', class_='BoxContent')
+        if page_title: res['name'] = page_title.get_text().split('\n')[0].strip()
+
+        # Busca Tabelas
+        tables = soup.find_all('table')
+        for table in tables:
+            # Verifica cabeçalho da tabela
+            header = table.find_previous('h2') or table.find_previous('div', class_='TableTitle')
+            if not header: continue
+            header_txt = header.get_text().lower()
+            
+            if "buy from" in header_txt:
+                for row in table.find_all('tr')[1:]:
+                    cols = row.find_all('td')
+                    if len(cols) >= 3:
+                        res['buy'].append(f"👤 {cols[0].text.strip()} ({cols[1].text.strip()}) 💰 {cols[2].text.strip()}")
+            
+            elif "sell to" in header_txt:
+                for row in table.find_all('tr')[1:]:
+                    cols = row.find_all('td')
+                    if len(cols) >= 3:
+                        res['sell'].append(f"🛒 {cols[0].text.strip()} ({cols[1].text.strip()}) 💰 {cols[2].text.strip()}")
+                        
         return res
     except Exception as e:
-        print(f"Erro Miracle Sales: {e}")
+        print(f"Erro Miracle Item: {e}")
         return None
 
 # ==========================================
-# 🔄 INTERFACES (COM EPHEMERAL=TRUE)
+# 🔄 INTERFACES
 # ==========================================
 
 class WikiModal(ui.Modal):
@@ -162,7 +195,7 @@ class WikiModal(ui.Modal):
     async def on_submit(self, interaction: discord.Interaction):
         q = self.children[0].value.strip(); t = TEXTOS[self.lang]
         
-        # IMPORTANTE: Ephemeral=True aqui faz a resposta ser "Só você pode ver"
+        # Mensagem Efêmera (Só você vê e some)
         await interaction.response.defer(ephemeral=True)
         
         if self.tipo == "monster":
@@ -174,9 +207,11 @@ class WikiModal(ui.Modal):
                 emb.add_field(name="❤️ HP", value=f"**{data['hp']}**", inline=True)
                 emb.add_field(name="🔮 XP", value=f"**{data['exp']}**", inline=True)
                 
-                # Loot Formatado
-                for cat, items in data['loot'].items():
-                    if items: emb.add_field(name=f"📦 {cat.replace(':','')}", value=items, inline=False)
+                if not data['loot']:
+                    emb.add_field(name="📦 Loot", value="Nenhum ou erro ao ler.", inline=False)
+                else:
+                    for cat, items in data['loot'].items():
+                        emb.add_field(name=f"📦 {cat}", value=items[:1000], inline=False)
                 
                 await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
         else:
@@ -184,18 +219,18 @@ class WikiModal(ui.Modal):
             if not data: 
                 await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
             else:
-                emb = discord.Embed(title=f"🛡️ {q.title()} (Miracle)", url=data['url'], color=discord.Color.blue())
+                emb = discord.Embed(title=f"🛡️ {data.get('name', q.title())}", url=data['url'], color=discord.Color.blue())
                 
                 if data['buy']: 
-                    chunks = "\n".join(data['buy'][:8]) # Limite para não estourar embed
-                    emb.add_field(name=t['wiki_buy_title'], value=chunks, inline=False)
+                    chunk = "\n".join(data['buy'][:10])
+                    emb.add_field(name=t['wiki_buy_title'], value=chunk, inline=False)
                 
                 if data['sell']: 
-                    chunks = "\n".join(data['sell'][:8])
-                    emb.add_field(name=t['wiki_sell_title'], value=chunks, inline=False)
+                    chunk = "\n".join(data['sell'][:10])
+                    emb.add_field(name=t['wiki_sell_title'], value=chunk, inline=False)
                 
-                if not data['buy'] and not data['sell']: 
-                    emb.description = "⚠️ Nenhum NPC comercializa este item (ou o item não existe no Market)."
+                if not data['buy'] and not data['sell']:
+                    emb.description = "⚠️ Item não encontrado em NPCs (ou erro de leitura do site)."
                 
                 await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
 
@@ -251,7 +286,6 @@ class LanguageSelect(ui.Select):
         super().__init__(placeholder="Selecione o Idioma...", options=opts)
     async def callback(self, i):
         t = TEXTOS[self.values[0]]; v = ModeSelect(self.values[0])
-        # Atualiza labels do Menu Principal
         v.children[0].label = t['btn_craft']; v.children[1].label = t['btn_alch']; v.children[2].label = t['btn_skill']
         v.children[3].label = t['btn_rashid']; v.children[4].label = t['btn_wiki']; v.children[5].label = t['btn_tools']
         await i.response.send_message(t['select_lang'], view=v, ephemeral=True)
