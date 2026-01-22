@@ -1,5 +1,4 @@
-# itens.py
-
+# --- CONFIGURAÇÕES GERAIS ---
 CONSTANTES_SKILLS = {
     "knight":    {"melee": 50,  "distance": 140, "shielding": 100},
     "paladin":   {"melee": 120, "distance": 25,  "shielding": 100},
@@ -58,9 +57,6 @@ ALCHEMY_RUNES = {
     "Destroy Field":        {"min": 19, "base": 83.33, "pro": False},
 }
 
-# --- NOVO: MINING PICKS ---
-# bonus_break: Soma na chance de quebrar (ex: +2%)
-# bonus_collect: Multiplica a chance de loot (ex: +25% = 1.25)
 MINING_PICKS = {
     "Pick (Normal)":        {"bonus_break": 0, "bonus_collect": 0.0},
     "Modified Pick":        {"bonus_break": 2, "bonus_collect": 0.25},
@@ -115,3 +111,9 @@ RASHID_SCHEDULE = {
     5: {"city": "Edron", "desc": "Na taverna acima do DP.", "url": "https://tibiamaps.io/map#33170,31812,6:3"},
     6: {"city": "Carlin", "desc": "Primeiro andar do DP.", "url": "https://tibiamaps.io/map#32334,31782,6:3"}
 }
+
+# --- URLs WIKI ---
+WIKI_MONSTER_URL = "https://tibia.fandom.com/wiki/"
+BASE_MIRACLE_URL = "https://miracle74.com/"
+MIRACLE_ITEMS_URL = "https://miracle74.com/?subtopic=items"
+MIRACLE_ITEM_ID_URL = "https://miracle74.com/?subtopic=items&id="
