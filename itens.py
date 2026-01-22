@@ -58,6 +58,16 @@ ALCHEMY_RUNES = {
     "Destroy Field":        {"min": 19, "base": 83.33, "pro": False},
 }
 
+# --- NOVO: MINING PICKS ---
+# bonus_break: Soma na chance de quebrar (ex: +2%)
+# bonus_collect: Multiplica a chance de loot (ex: +25% = 1.25)
+MINING_PICKS = {
+    "Pick (Normal)":        {"bonus_break": 0, "bonus_collect": 0.0},
+    "Modified Pick":        {"bonus_break": 2, "bonus_collect": 0.25},
+    "Advanced Pick":        {"bonus_break": 4, "bonus_collect": 0.50},
+    "Enhanced Pick":        {"bonus_break": 6, "bonus_collect": 1.00}
+}
+
 ALCHEMY_MENU_CATS = {
     "cat_atk": ["Sudden Death", "Explosion", "Great Fireball", "Heavy Magic Missile", "Light Magic Missile", "Fireball", "Ultimate Healing", "Intense Healing", "Antidote Rune", "Envenom"],
     "cat_sup": ["Paralyze", "Magic Wall", "Energy Bomb", "Energy Wall", "Energy Field", "Fire Bomb", "Fire Wall", "Fire Field", "Poison Bomb", "Poison Wall", "Poison Field", "Soulfire", "Animate Dead", "Convince Creature", "Chameleon", "Desintegrate", "Destroy Field"]
@@ -96,12 +106,10 @@ ESTRUTURA_MENU = {
     }
 }
 
-# --- RASHID SCHEDULE (CORRIGIDO) ---
-# Se URL for None, o bot não mostra o link
 RASHID_SCHEDULE = {
     0: {"city": "Thais", "desc": "Ao lado direito do DP.", "url": "https://tibiamaps.io/map#32359,32226,6:3"},
     1: {"city": "Venore", "desc": "Loja ao sul/direita do DP.", "url": "https://tibiamaps.io/map#32945,32110,6:3"},
-    2: {"city": "Ab'Dendriel", "desc": "Na taverna.", "url": None}, # <-- URL REMOVIDA AQUI
+    2: {"city": "Ab'Dendriel", "desc": "Na taverna.", "url": None},
     3: {"city": "Ankrahmun", "desc": "Acima do Post Office.", "url": "https://tibiamaps.io/map#33069,32882,6:4"},
     4: {"city": "Darashia", "desc": "Na taverna.", "url": "https://tibiamaps.io/map#33235,32485,7:3"},
     5: {"city": "Edron", "desc": "Na taverna acima do DP.", "url": "https://tibiamaps.io/map#33170,31812,6:3"},
