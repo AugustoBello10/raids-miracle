@@ -167,7 +167,7 @@ class ModeSelect(ui.View):
     @ui.button(label="Extras", style=discord.ButtonStyle.primary, row=1)
     async def tools(self, i, b): await i.response.send_message("Extras:", view=ToolsSelect(self.lang), ephemeral=True)
     @ui.button(label="Donate", style=discord.ButtonStyle.secondary, row=1)
-    async def donate(self, i, b): await i.response.send_message("Pix:[Link](https://livepix.gg/obellao) / MC: **Dormir pra que / Carlin**", ephemeral=True)
+    async def donate(self, i, b): await i.response.send_message("Pix: `seu_email` / TC: **Obellao**", ephemeral=True)
 
 class LanguageSelect(ui.Select):
     def __init__(self):
@@ -194,4 +194,143 @@ class ToolsSelect(ui.View):
     @ui.button(label="Mining", style=discord.ButtonStyle.secondary)
     async def mining(self, i, b):
         v = ui.View(timeout=None); v.add_item(MiningPickSelect(self.lang))
-        await i
+        await i.response.send_message(TEXTOS[self.lang]['mining_pick_ph'], view=v, ephemeral=True)
+    @ui.button(label="Party", style=discord.ButtonStyle.primary)
+    async def party(self, i, b): await i.response.send_modal(PartyShareModal(self.lang))
+    @ui.button(label="SS", style=discord.ButtonStyle.danger)
+    async def ss(self, i, b):
+        agora = datetime.now(FUSO_BRASILIA)
+        target = agora.replace(hour=5, minute=0, second=0, microsecond=0)
+        if agora.hour >= 5: target += timedelta(days=1)
+        diff = target - agora
+        tempo = f"{int(diff.total_seconds()//3600)}h {int((diff.total_seconds()%3600)//60)}m"
+        await i.response.send_message(TEXTOS[self.lang]['ss_msg'].format(tempo), ephemeral=True)
+
+class MiningPickSelect(ui.Select):
+    def __init__(self, lang):
+        self.lang = lang
+        opts = [discord.SelectOption(label=p, value=p) for p in MINING_PICKS.keys()]
+        super().__init__(placeholder="Pick...", options=opts)
+    async def callback(self, i): await i.response.send_modal(MiningModal(self.values[0], self.lang))
+
+class MiningModal(ui.Modal):
+    def __init__(self, pick, lang):
+        self.pick = pick; self.lang = lang; t = TEXTOS[lang]
+        super().__init__(title=t['mining_title'])
+        self.add_item(ui.TextInput(label=t['mining_skill_label']))
+    async def on_submit(self, i):
+        res = calcular_mining(int(self.children[0].value), self.pick)
+        t = TEXTOS[self.lang]
+        emb = discord.Embed(title=t['mining_title'], color=discord.Color.greyple())
+        emb.add_field(name=t['mining_res_break'], value=f"{res['break_chance']}%")
+        emb.add_field(name=t['mining_res_min'], value=f"{res['minerals_chance']}%")
+        emb.add_field(name=t['mining_res_frag'], value=f"{res['fragments_chance']}%")
+        await i.response.send_message(embed=emb, ephemeral=True)
+
+class PartyShareModal(ui.Modal):
+    def __init__(self, lang):
+        self.lang = lang; t = TEXTOS[lang]
+        super().__init__(title=t['party_title'])
+        self.add_item(ui.TextInput(label=t['party_label']))
+    async def on_submit(self, i):
+        mi, ma = calcular_party_range(int(self.children[0].value))
+        t = TEXTOS[self.lang]
+        await i.response.send_message(t['party_res'].format(self.children[0].value) + f" **{mi} - {ma}**", ephemeral=True)
+
+class AlchemySelect(ui.View):
+    def __init__(self, lang): super().__init__(timeout=None); self.lang = lang
+    @ui.button(label="💰 Gold Converter", style=discord.ButtonStyle.primary)
+    async def gold(self, i, b): await i.response.send_modal(AlchemyGoldModal(self.lang))
+    @ui.button(label="✨ Enchant", style=discord.ButtonStyle.secondary)
+    async def enchant(self, i, b): 
+        v = ui.View(timeout=None); v.add_item(AlchemyEnchantSelect(self.lang))
+        await i.response.send_message("Crystal:", view=v, ephemeral=True)
+    @ui.button(label="💎 Runes", style=discord.ButtonStyle.success)
+    async def runes(self, i, b):
+        v = ui.View(timeout=None); v.add_item(AlchemyRuneCategorySelect(self.lang))
+        await i.response.send_message("Runa:", view=v, ephemeral=True)
+
+class AlchemyGoldModal(ui.Modal):
+    def __init__(self, lang):
+        self.lang = lang; t = TEXTOS[lang]
+        super().__init__(title=t['alch_gold'])
+        self.add_item(ui.TextInput(label=t['alch_skill_label']))
+        self.add_item(ui.TextInput(label=t['alch_gold_label']))
+    async def on_submit(self, i):
+        raw = self.children[1].value.lower().replace('k', '000')
+        res = calcular_alchemy_gold(int(self.children[0].value), int(raw))
+        t = TEXTOS[self.lang]
+        await i.response.send_message(f"{t['alch_needs']} {res['converters']}x {t['alch_conv_name']}", ephemeral=True)
+
+class AlchemyEnchantSelect(ui.Select):
+    def __init__(self, lang):
+        self.lang = lang; crystals = ALCHEMY_DATA['crystals']
+        opts = [discord.SelectOption(label=n, value=f"{n}|{d['base_chance']}") for n,d in crystals.items()]
+        super().__init__(placeholder="Cristal...", options=opts)
+    async def callback(self, i): await i.response.send_modal(AlchemyEnchantModal(self.values[0].split('|')[0], float(self.values[0].split('|')[1]), self.lang))
+
+class AlchemyEnchantModal(ui.Modal):
+    def __init__(self, n, b, l): super().__init__(title=n); self.n=n; self.b=b; self.l=l; self.add_item(ui.TextInput(label="Skill"))
+    async def on_submit(self, i):
+        res = calcular_alchemy_enchant(int(self.children[0].value), self.b)
+        await i.response.send_message(f"Chance: {res['chance_real']}%", ephemeral=True)
+
+class AlchemyRuneCategorySelect(ui.Select):
+    def __init__(self, lang):
+        super().__init__(placeholder="Categoria..."); self.lang = lang
+        self.add_option(label="Attack", value="cat_atk"); self.add_option(label="Support", value="cat_sup")
+    async def callback(self, i):
+        v = ui.View(timeout=None); v.add_item(AlchemyRuneSelect(self.values[0], self.lang))
+        await i.response.edit_message(view=v)
+
+class AlchemyRuneSelect(ui.Select):
+    def __init__(self, cat, lang):
+        super().__init__(placeholder="Runa..."); self.lang = lang
+        for r in ALCHEMY_MENU_CATS[cat]: self.add_option(label=r, value=r)
+    async def callback(self, i): await i.response.send_modal(AlchemyRuneModal(self.values[0], self.lang))
+
+class AlchemyRuneModal(ui.Modal):
+    def __init__(self, r, l): super().__init__(title=r); self.r=r; self.l=l; self.add_item(ui.TextInput(label="Skill"))
+    async def on_submit(self, i):
+        res = calcular_alchemy_rune(int(self.children[0].value), self.r)
+        await i.response.send_message(f"Chance: {res['chance']}%", ephemeral=True)
+
+class CategorySelect(ui.Select):
+    def __init__(self, lang):
+        self.lang = lang; cats = ESTRUTURA_MENU['crafting']
+        t = TEXTOS[lang]
+        opts = [discord.SelectOption(label=t['cats'].get(k, k), value=k) for k in cats.keys()]
+        super().__init__(placeholder=t['select_cat'], options=opts)
+    async def callback(self, i): await i.response.edit_message(content="Item...", view=ui.View().add_item(ItemSelect(self.values[0], self.lang)))
+
+class ItemSelect(ui.Select):
+    def __init__(self, c, l):
+        self.l=l; itens = sorted(ESTRUTURA_MENU['crafting'][c])
+        opts = [discord.SelectOption(label=it, value=it) for it in itens]
+        super().__init__(placeholder="Item...", options=opts)
+    async def callback(self, i): await i.response.send_modal(DynamicCraftingModal(self.values[0], RECEITAS[self.values[0]], self.l))
+
+class DynamicCraftingModal(ui.Modal):
+    def __init__(self, n, r, l):
+        t = TEXTOS[l]; super().__init__(title=n); self.r=r; self.l=l; self.n=n
+        self.add_item(ui.TextInput(label=t['label_skill']))
+        self.add_item(ui.TextInput(label=t['label_qtd'], default="1"))
+    async def on_submit(self, i):
+        res = calcular_crafting_detalhado(int(self.children[0].value), self.r['multiplicador'], {}, int(self.children[1].value))
+        await i.response.send_message(f"Sucesso: {res['chance_sucesso']}%", ephemeral=True)
+
+class VocationSelect(ui.Select):
+    def __init__(self, lang):
+        self.lang = lang
+        opts = [discord.SelectOption(label="Knight", value="knight"), discord.SelectOption(label="Paladin", value="paladin")]
+        super().__init__(placeholder="Vocação...", options=opts)
+    async def callback(self, i): await i.response.send_message("Em construção...", ephemeral=True)
+
+@bot.tree.command(name="setup_calculadora")
+async def setup(i): await i.response.send_message(embed=discord.Embed(title="⚒️ Miracle Tools", color=discord.Color.gold()), view=PersistentControlView())
+
+if __name__ == "__main__":
+    if TOKEN:
+        Thread(target=run_web_server, daemon=True).start()
+        Thread(target=loop_monitoramento, daemon=True).start()
+        bot.run(TOKEN)
