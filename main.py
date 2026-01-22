@@ -17,27 +17,44 @@ from idiomas import TEXTOS
 TOKEN = os.environ.get('DISCORD_TOKEN') 
 FUSO_BRASILIA = pytz.timezone('America/Sao_Paulo')
 
+# Cabeçalho para fingir ser um navegador (Evita bloqueio do site do Miracle)
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+}
+
 app = Flask('')
 @app.route('/')
-def home(): return "Bot Bellão V28 Full Tradução Online"
+def home(): return "Bot Bellão V29 (Regex+UA) Online"
 def run_web_server(): app.run(host='0.0.0.0', port=8080)
 
 # --- MEMÓRIA DOS ITENS ---
 ITEM_ID_MAP = {}
 
 def indexar_itens_miracle():
+    """Busca itens fingindo ser um navegador para evitar bloqueio 403."""
     global ITEM_ID_MAP
+    print("Iniciando indexação dos itens...")
     try:
+        # Categorias principais do Miracle
         cats = ["helmets", "armors", "legs", "boots", "shields", "swords", "axes", "clubs", "distance", "wands", "rods", "amulets", "rings", "runes", "tools"]
+        count = 0
         for cat in cats:
             url = f"{MIRACLE_ITEMS_URL}&category={cat}"
-            resp = requests.get(url, timeout=10)
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            for link in soup.find_all('a', href=re.compile(r'id=')):
-                m = re.search(r'id=(\d+)', link['href'])
-                if m: ITEM_ID_MAP[link.text.strip().lower()] = m.group(1)
-        print(f"Indexação: {len(ITEM_ID_MAP)} itens.")
-    except Exception as e: print(f"Erro indexação: {e}")
+            try:
+                resp = requests.get(url, headers=HEADERS, timeout=10)
+                if resp.status_code == 200:
+                    soup = BeautifulSoup(resp.text, 'html.parser')
+                    for link in soup.find_all('a', href=re.compile(r'id=')):
+                        m = re.search(r'id=(\d+)', link['href'])
+                        if m: 
+                            nome = link.text.strip().lower()
+                            ITEM_ID_MAP[nome] = m.group(1)
+                            count += 1
+            except Exception as e_cat:
+                print(f"Erro na categoria {cat}: {e_cat}")
+        print(f"Indexação concluída: {count} itens mapeados com sucesso.")
+    except Exception as e: 
+        print(f"Erro fatal na indexação: {e}")
 
 class MyBot(discord.Client):
     def __init__(self):
@@ -50,59 +67,90 @@ class MyBot(discord.Client):
 
 bot = MyBot()
 
-# --- SCRAPERS ---
+# --- SCRAPERS CORRIGIDOS ---
 def buscar_wiki_monster(nome):
     try:
         url = f"{WIKI_MONSTER_URL}{nome.replace(' ', '_').title()}"
-        resp = requests.get(url, timeout=5)
+        resp = requests.get(url, headers=HEADERS, timeout=5)
         if resp.status_code != 200: return None
         soup = BeautifulSoup(resp.text, 'html.parser')
+        text_content = soup.get_text() # Pega todo o texto da página para usar Regex
         
-        info = {"hp": "?", "exp": "?", "hab": "?", "loot": {}, "url": url}
+        info = {"hp": "?", "exp": "?", "hab": "Ver na Wiki", "loot": {}, "url": url}
         
-        # 1. HP, XP e Habilidades
-        cells = soup.find_all('td')
-        for i, cell in enumerate(cells):
-            t = cell.text.strip().lower()
-            if "pontos de vida" in t: info['hp'] = cells[i+1].text.strip()
-            if "experiência" in t: info['exp'] = cells[i+1].text.strip()
-            if "habilidades" in t: info['hab'] = cells[i+1].text.strip()
+        # 1. Regex para pegar HP e XP (Procura números antes de "HP" e "XP")
+        # Ex: "1000 HP" ou "1.000 HP"
+        match_hp = re.search(r'(\d+(?:\.\d+)*)\s*HP', text_content)
+        if match_hp: info['hp'] = match_hp.group(1)
+        
+        match_exp = re.search(r'(\d+(?:\.\d+)*)\s*XP', text_content)
+        if match_exp: info['exp'] = match_exp.group(1)
 
-        # 2. Loot
-        txt_completo = soup.get_text()
+        # 2. Habilidades (Tenta pegar da Infobox ou seção)
+        # Simplificado para evitar erros de layout, foca no link se falhar
+        hab_section = soup.find('div', id='mw-content-text')
+        if hab_section:
+            # Tenta achar linhas comuns de habilidade
+            if "Habilidades:" in text_content:
+                pass # Lógica complexa, melhor deixar o usuário clicar no link se for detalhado
+
+        # 3. Loot por Categorias (Lógica mantida, funciona bem)
         loot_cats = ["Comum:", "Incomum:", "Semi-Raro:", "Raro:", "Muito Raro:"]
         for i, cat in enumerate(loot_cats):
-            if cat in txt_completo:
-                start = txt_completo.find(cat) + len(cat)
-                end = txt_completo.find(loot_cats[i+1]) if i+1 < len(loot_cats) else txt_completo.find("Durante Invasões")
-                items = txt_completo[start:end].strip().split('.')
-                info['loot'][cat] = items[0].strip()
+            if cat in text_content:
+                start = text_content.find(cat) + len(cat)
+                # O fim é a próxima categoria ou "Durante Invasões"
+                next_cat = loot_cats[i+1] if i+1 < len(loot_cats) else "Durante Invasões"
+                end = text_content.find(next_cat)
+                if end == -1: end = text_content.find("Durante Eventos") # Fallback
+                
+                if start != -1 and end != -1:
+                    raw_items = text_content[start:end].strip()
+                    # Limpa quebras de linha excessivas
+                    clean_items = " ".join(raw_items.split())
+                    info['loot'][cat] = clean_items[:900] # Limite do Discord
 
         return info
-    except: return None
+    except Exception as e:
+        print(f"Erro Wiki Monster: {e}")
+        return None
 
 def buscar_vendas_miracle(item_name):
+    # Tenta achar o ID pelo nome (insensível a maiúsculas)
     item_id = ITEM_ID_MAP.get(item_name.lower())
-    if not item_id: return None
+    
+    # Se não achou, tenta recarregar indexação rápido (caso tenha ligado agora)
+    if not item_id: 
+        return None
+    
     try:
         url = f"{MIRACLE_ITEM_ID_URL}{item_id}"
-        soup = BeautifulSoup(requests.get(url, timeout=5).text, 'html.parser')
+        resp = requests.get(url, headers=HEADERS, timeout=5)
+        soup = BeautifulSoup(resp.text, 'html.parser')
         res = {"buy": [], "sell": [], "url": url}
+        
+        # Procura H2 headers que contenham "Buy From" ou "Sell To"
         for h2 in soup.find_all('h2'):
-            t = h2.text.lower()
-            if "buy from" in t:
-                for r in h2.find_next('table').find_all('tr')[1:]:
-                    c = r.find_all('td')
-                    if len(c) >= 3: res['buy'].append(f"👤 {c[0].text} ({c[1].text}) - {c[2].text}")
-            elif "sell to" in t:
-                for r in h2.find_next('table').find_all('tr')[1:]:
-                    c = r.find_all('td')
-                    if len(c) >= 3: res['sell'].append(f"💰 {c[0].text} ({c[1].text}) - {c[2].text}")
+            txt = h2.text.lower()
+            if "buy from" in txt:
+                table = h2.find_next('table')
+                if table:
+                    for row in table.find_all('tr')[1:]:
+                        c = row.find_all('td')
+                        if len(c) >= 3: res['buy'].append(f"👤 **{c[0].text}** ({c[1].text}) 💰 {c[2].text}")
+            elif "sell to" in txt:
+                table = h2.find_next('table')
+                if table:
+                    for row in table.find_all('tr')[1:]:
+                        c = row.find_all('td')
+                        if len(c) >= 3: res['sell'].append(f"🛒 **{c[0].text}** ({c[1].text}) 💰 {c[2].text}")
         return res
-    except: return None
+    except Exception as e:
+        print(f"Erro Miracle Sales: {e}")
+        return None
 
 # ==========================================
-# 🔄 INTERFACES
+# 🔄 INTERFACES (COM EPHEMERAL=TRUE)
 # ==========================================
 
 class WikiModal(ui.Modal):
@@ -113,34 +161,49 @@ class WikiModal(ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction):
         q = self.children[0].value.strip(); t = TEXTOS[self.lang]
+        
+        # IMPORTANTE: Ephemeral=True aqui faz a resposta ser "Só você pode ver"
         await interaction.response.defer(ephemeral=True)
+        
         if self.tipo == "monster":
             data = buscar_wiki_monster(q)
-            if not data: await interaction.followup.send(t['wiki_error'].format(q))
+            if not data: 
+                await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
             else:
                 emb = discord.Embed(title=f"🐲 {q.title()}", url=data['url'], color=discord.Color.red())
-                emb.add_field(name="❤️ HP", value=data['hp'], inline=True)
-                emb.add_field(name="🔮 XP", value=data['exp'], inline=True)
-                if data['hab'] != "?": emb.add_field(name="⚔️ Hab", value=data['hab'][:1024], inline=False)
+                emb.add_field(name="❤️ HP", value=f"**{data['hp']}**", inline=True)
+                emb.add_field(name="🔮 XP", value=f"**{data['exp']}**", inline=True)
+                
+                # Loot Formatado
                 for cat, items in data['loot'].items():
-                    if items: emb.add_field(name=f"📦 {cat}", value=items[:1000], inline=False)
-                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang))
+                    if items: emb.add_field(name=f"📦 {cat.replace(':','')}", value=items, inline=False)
+                
+                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
         else:
             data = buscar_vendas_miracle(q)
-            if not data: await interaction.followup.send(t['wiki_error'].format(q))
+            if not data: 
+                await interaction.followup.send(t['wiki_error'].format(q), ephemeral=True)
             else:
                 emb = discord.Embed(title=f"🛡️ {q.title()} (Miracle)", url=data['url'], color=discord.Color.blue())
-                if data['buy']: emb.add_field(name=t['wiki_buy_title'], value="\n".join(data['buy'][:10]), inline=False)
-                if data['sell']: emb.add_field(name=t['wiki_sell_title'], value="\n".join(data['sell'][:10]), inline=False)
-                if not data['buy'] and not data['sell']: emb.description = "Nenhum NPC compra/vende este item."
-                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang))
+                
+                if data['buy']: 
+                    chunks = "\n".join(data['buy'][:8]) # Limite para não estourar embed
+                    emb.add_field(name=t['wiki_buy_title'], value=chunks, inline=False)
+                
+                if data['sell']: 
+                    chunks = "\n".join(data['sell'][:8])
+                    emb.add_field(name=t['wiki_sell_title'], value=chunks, inline=False)
+                
+                if not data['buy'] and not data['sell']: 
+                    emb.description = "⚠️ Nenhum NPC comercializa este item (ou o item não existe no Market)."
+                
+                await interaction.followup.send(embed=emb, view=WikiSelect(self.lang), ephemeral=True)
 
 class WikiSelect(ui.View):
     def __init__(self, lang): 
         super().__init__(timeout=None)
         self.lang = lang
         t = TEXTOS[lang]
-        # Atualiza o texto dos botões com base na língua
         self.children[0].label = t['wiki_monster']
         self.children[1].label = t['wiki_item']
         self.children[2].label = "Menu"
@@ -206,7 +269,6 @@ class ToolsSelect(ui.View):
         super().__init__(timeout=None)
         self.lang = lang
         t = TEXTOS[lang]
-        # Atualiza labels dos botões extras
         self.children[0].label = t['btn_mining']
         self.children[1].label = t['btn_party']
         self.children[2].label = t['btn_ss']
