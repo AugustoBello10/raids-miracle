@@ -1,21 +1,10 @@
-# --- CONFIGURAÇÕES GERAIS ---
-CONSTANTES_SKILLS = {
-    "knight":    {"melee": 50,  "distance": 140, "shielding": 100},
-    "paladin":   {"melee": 120, "distance": 25,  "shielding": 100},
-    "druid":     {"melee": 200, "distance": 200, "shielding": 100},
-    "sorcerer":  {"melee": 200, "distance": 200, "shielding": 100}
-}
+# itens.py - Database de Itens e Receitas
 
-ARMAS_TREINO = {
-    "Normal / Nenhuma":        {"speed": 2.0, "charges": 999999999},
-    "Weapon (-5% Atk Speed)":  {"speed": 1.9,  "charges": 999999999},
-    "Weapon (-6% Atk Speed)":  {"speed": 1.88, "charges": 999999999},
-    "Spark Weapon (3.6k)":     {"speed": 1.8, "charges": 3600},
-    "Spark Shield (7.2k)":     {"speed": 1.8, "charges": 7200},
-    "Lightning Weapon (7.2k)": {"speed": 1.7, "charges": 7200},
-    "Lightning Shield (14.4k)": {"speed": 1.7, "charges": 14400},
-    "Inferno Weapon (10.8k)":  {"speed": 1.6, "charges": 10800},
-    "Inferno Shield (21.6k)":  {"speed": 1.6, "charges": 21600},
+CONSTANTES_SKILLS = {
+    "knight": {"melee": 50, "distance": 140, "shielding": 100},
+    "paladin": {"melee": 120, "distance": 25, "shielding": 100},
+    "druid": {"melee": 200, "distance": 200, "shielding": 100},
+    "sorcerer": {"melee": 200, "distance": 200, "shielding": 100}
 }
 
 ALCHEMY_DATA = {
@@ -33,6 +22,35 @@ ALCHEMY_RUNES = {
 MINING_PICKS = {
     "Pick (Normal)": {"bonus_break": 0, "bonus_collect": 0.0}, "Modified Pick": {"bonus_break": 2, "bonus_collect": 0.25},
     "Advanced Pick": {"bonus_break": 4, "bonus_collect": 0.50}, "Enhanced Pick": {"bonus_break": 6, "bonus_collect": 1.00}
+}
+
+ALCHEMY_MENU_CATS = {
+    "cat_atk": ["Sudden Death", "Explosion", "Great Fireball", "Heavy Magic Missile", "Light Magic Missile", "Fireball", "Ultimate Healing", "Intense Healing", "Envenom"],
+    "cat_sup": ["Paralyze", "Magic Wall", "Energy Bomb", "Energy Wall", "Fire Bomb", "Fire Wall", "Poison Bomb", "Poison Wall", "Soulfire", "Animate Dead", "Convince Creature", "Chameleon", "Desintegrate", "Destroy Field"]
+}
+
+# --- LISTA MESTRA DE RECEITAS ---
+RECEITAS = {
+    "Giant Ruby": { "multiplicador": 5, "ingredientes": {"Small Ruby": 10}, "perde_na_falha": True },
+    "Giant Emerald": { "multiplicador": 5, "ingredientes": {"Small Emerald": 10}, "perde_na_falha": True },
+    "Giant Sapphire": { "multiplicador": 5, "ingredientes": {"Small Sapphire": 10}, "perde_na_falha": True },
+    "Giant Amethyst": { "multiplicador": 5, "ingredientes": {"Small Amethyst": 10}, "perde_na_falha": True },
+    "Modified Pick": { "multiplicador": 2, "ingredientes": {"Pick": 1, "Steel": 5}, "perde_na_falha": True },
+    "Advanced Pick": { "multiplicador": 1.5, "ingredientes": {"Pick": 1, "Steel": 10}, "perde_na_falha": True },
+    "Enhanced Pick": { "multiplicador": 1, "ingredientes": {"Pick": 1, "Steel": 20}, "perde_na_falha": True },
+    "Diamond Knife": { "multiplicador": 1, "ingredientes": {"Combat Knife": 1, "Small Diamond": 10, "Hell Steel": 5}, "perde_na_falha": True },
+    "Ember Rune": { "multiplicador": 1, "ingredientes": {"Ember Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Protector Rune": { "multiplicador": 1, "ingredientes": {"Protector Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Obsidian Rune": { "multiplicador": 1, "ingredientes": {"Obsidian Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Aegis Rune": { "multiplicador": 1, "ingredientes": {"Aegis Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Astral Rune": { "multiplicador": 1, "ingredientes": {"Astral Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Molten Rune": { "multiplicador": 1, "ingredientes": {"Molten Fragment": 5, "Pulverized Ore": 3, "Onyx": 1}, "nao_perde": ["Onyx"] },
+    "Fiery Stone": { "multiplicador": 0.5, "ingredientes": {"Glimmering Soil": 5}, "perde_na_falha": True },
+    "Reinforced Rod": { "multiplicador": 2, "ingredientes": {"Fishing Rod": 1, "Steel": 5}, "perde_na_falha": True },
+    "Engineered Fishing Rod": { "multiplicador": 1.5, "ingredientes": {"Fishing Rod": 1, "Steel": 10, "Draconian Steel": 1}, "perde_na_falha": True },
+    "Volcanic Fishing Rod": { "multiplicador": 1, "ingredientes": { "Fishing Rod": 1, "Steel": 20, "Glimmering Soil": 10, "Draconian Steel": 5, "Hell Steel": 3 }, "perde_na_falha": True },
+    "Golden Fishing Rod": { "multiplicador": 0.5, "ingredientes": { "Fishing Rod": 1, "Steel": 40, "Draconian Steel": 10, "Gold Ingot": 3, "Hell Steel": 3 }, "perde_na_falha": True },
+    "10x Steel Bolts": { "multiplicador": 0.4, "ingredientes": {"Bolt": 5, "Steel": 1, "Natural Soil": 1}, "perde_na_falha": True },
 }
 
 ESTRUTURA_MENU = {
@@ -56,6 +74,3 @@ RASHID_SCHEDULE = {
 }
 
 WIKI_MONSTER_URL = "https://www.tibiawiki.com.br/wiki/"
-BASE_MIRACLE_URL = "https://miracle74.com/"
-MIRACLE_ITEMS_URL = "https://miracle74.com/?subtopic=items"
-MIRACLE_ITEM_ID_URL = "https://miracle74.com/?subtopic=items&id="
